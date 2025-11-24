@@ -17,6 +17,8 @@ class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "checkout_bridge"
     private var cardPlatformView: CardPlatformView? = null
     private var googlePayPlatformView: GooglePayPlatformView? = null
+    private var googlePayTokenizer: GooglePayTokenizer? = null
+    private lateinit var channel: MethodChannel
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -42,9 +44,12 @@ class MainActivity : FlutterFragmentActivity() {
         )
 
         // Set up method channel for calls from Flutter
-        MethodChannel(messenger, CHANNEL).setMethodCallHandler { call, result ->
-            handleMethodCall(call, result)
-        }
+        channel = MethodChannel(messenger, CHANNEL)
+        channel.setMethodCallHandler { call, result -> handleMethodCall(call, result) }
+
+        // Initialize Google Pay tokenizer
+        googlePayTokenizer = GooglePayTokenizer(this, channel)
+        Log.d("MainActivity", "Google Pay tokenizer initialized")
     }
 
     /** Handle method calls from Flutter */
@@ -83,28 +88,48 @@ class MainActivity : FlutterFragmentActivity() {
 
             // ==================== GOOGLE PAY METHODS ====================
             "initGooglePay" -> {
-                // Google Pay initialization happens in PlatformView
+                @Suppress("UNCHECKED_CAST") val args = call.arguments as? Map<String, Any>
+
+                val sessionId = args?.get("paymentSessionID") as? String ?: ""
+                val sessionSecret = args?.get("paymentSessionSecret") as? String ?: ""
+                val publicKey = args?.get("publicKey") as? String ?: ""
+                val environment = args?.get("environment") as? String ?: "sandbox"
+
+                googlePayTokenizer?.initialize(sessionId, sessionSecret, publicKey, environment)
                 result.success(true)
             }
             "checkGooglePayAvailability" -> {
-                if (googlePayPlatformView == null) {
-                    result.error("GOOGLEPAY_NOT_READY", "Google Pay view not initialized", null)
-                    return
-                }
-                val isAvailable = googlePayPlatformView?.checkAvailability() ?: false
-                result.success(isAvailable)
+                // Pay package handles availability checks
+                result.success(true)
             }
-            "launchGooglePaySheet" -> {
-                if (googlePayPlatformView == null) {
-                    result.error("GOOGLEPAY_NOT_READY", "Google Pay view not initialized", null)
+            "tokenizeGooglePayData" -> {
+                if (googlePayTokenizer == null) {
+                    result.error(
+                            "GOOGLEPAY_NOT_READY",
+                            "Google Pay tokenizer not initialized",
+                            null
+                    )
                     return
                 }
-                @Suppress("UNCHECKED_CAST") val requestData = call.arguments as? Map<String, Any>
-                googlePayPlatformView?.launchPaymentSheet(requestData, result)
+
+                @Suppress("UNCHECKED_CAST") val args = call.arguments as? Map<String, Any>
+                val paymentData = args?.get("paymentData") as? String
+
+                if (paymentData == null) {
+                    result.error("INVALID_ARGS", "Payment data is required", null)
+                    return
+                }
+
+                googlePayTokenizer?.tokenizePaymentData(paymentData, result)
             }
             else -> {
                 result.notImplemented()
             }
         }
+    }
+
+    override fun onDestroy() {
+        googlePayTokenizer?.dispose()
+        super.onDestroy()
     }
 }

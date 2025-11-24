@@ -172,6 +172,25 @@ class PaymentBridge {
     }
   }
 
+  /// Tokenize Google Pay payment data using Checkout SDK
+  Future<void> tokenizeGooglePayData(String paymentData) async {
+    try {
+      log('[Checkout]: 🔄 Tokenizing Google Pay data...');
+      await _channel.invokeMethod('tokenizeGooglePayData', {
+        'paymentData': paymentData,
+      });
+      // Token will come via cardTokenized callback
+    } on PlatformException catch (e) {
+      log('[Checkout]: ❌ Google Pay tokenization failed: ${e.message}');
+      onPaymentError?.call(
+        PaymentErrorResult(
+          errorCode: e.code,
+          errorMessage: e.message ?? 'Google Pay tokenization failed',
+        ),
+      );
+    }
+  }
+
   // ==================== UTILITY METHODS ====================
 
   /// Reset/clear all callbacks

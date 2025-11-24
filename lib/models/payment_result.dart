@@ -157,3 +157,21 @@ class GooglePayResult {
     return 'GooglePayResult(success: $success, error: $error)';
   }
 }
+
+class SessionDataResult {
+  final Map<String, dynamic>? data;
+
+  SessionDataResult({this.data});
+
+  factory SessionDataResult.fromMap(dynamic data) {
+    if (data is Map) {
+      return SessionDataResult(data: Map<String, dynamic>.from(data));
+    }
+    return SessionDataResult();
+  }
+
+  @override
+  String toString() {
+    return 'SessionDataResult(data: $data)';
+  }
+}
