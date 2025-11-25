@@ -20,6 +20,10 @@ class MainActivity : FlutterFragmentActivity() {
     private var googlePayTokenizer: GooglePayTokenizer? = null
     private lateinit var channel: MethodChannel
 
+    companion object {
+        private const val TAG = "MainActivity"
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -88,39 +92,144 @@ class MainActivity : FlutterFragmentActivity() {
 
             // ==================== GOOGLE PAY METHODS ====================
             "initGooglePay" -> {
-                @Suppress("UNCHECKED_CAST") val args = call.arguments as? Map<String, Any>
+                try {
+                    Log.d(TAG, "Initializing Google Pay")
 
-                val sessionId = args?.get("paymentSessionID") as? String ?: ""
-                val sessionSecret = args?.get("paymentSessionSecret") as? String ?: ""
-                val publicKey = args?.get("publicKey") as? String ?: ""
-                val environment = args?.get("environment") as? String ?: "sandbox"
+                    if (googlePayTokenizer == null) {
+                        Log.e(TAG, "Google Pay tokenizer instance is null")
+                        result.error(
+                                "GOOGLEPAY_NOT_READY",
+                                "Google Pay tokenizer not initialized",
+                                null
+                        )
+                        return
+                    }
 
-                googlePayTokenizer?.initialize(sessionId, sessionSecret, publicKey, environment)
-                result.success(true)
-            }
-            "checkGooglePayAvailability" -> {
-                // Pay package handles availability checks
-                result.success(true)
-            }
-            "tokenizeGooglePayData" -> {
-                if (googlePayTokenizer == null) {
+                    @Suppress("UNCHECKED_CAST") val args = call.arguments as? Map<String, Any>
+
+                    if (args == null) {
+                        Log.e(TAG, "Google Pay init: Missing arguments")
+                        result.error("INVALID_ARGS", "Configuration parameters are required", null)
+                        return
+                    }
+
+                    val sessionId = args["paymentSessionID"] as? String
+                    val sessionSecret = args["paymentSessionSecret"] as? String
+                    val publicKey = args["publicKey"] as? String
+                    val environment = args["environment"] as? String ?: "sandbox"
+
+                    // Validate required parameters
+                    when {
+                        sessionId.isNullOrBlank() -> {
+                            Log.e(TAG, "Google Pay init: Missing session ID")
+                            result.error("INVALID_ARGS", "Session ID is required", null)
+                            return
+                        }
+                        sessionSecret.isNullOrBlank() -> {
+                            Log.e(TAG, "Google Pay init: Missing session secret")
+                            result.error("INVALID_ARGS", "Session secret is required", null)
+                            return
+                        }
+                        publicKey.isNullOrBlank() -> {
+                            Log.e(TAG, "Google Pay init: Missing public key")
+                            result.error("INVALID_ARGS", "Public key is required", null)
+                            return
+                        }
+                    }
+
+                    googlePayTokenizer?.initialize(
+                            sessionId!!,
+                            sessionSecret!!,
+                            publicKey!!,
+                            environment
+                    )
+                    result.success(true)
+                    Log.d(TAG, "Google Pay initialization request sent")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in initGooglePay", e)
                     result.error(
-                            "GOOGLEPAY_NOT_READY",
-                            "Google Pay tokenizer not initialized",
+                            "INIT_ERROR",
+                            "Failed to initialize Google Pay: ${e.message}",
                             null
                     )
-                    return
                 }
-
-                @Suppress("UNCHECKED_CAST") val args = call.arguments as? Map<String, Any>
-                val paymentData = args?.get("paymentData") as? String
-
-                if (paymentData == null) {
-                    result.error("INVALID_ARGS", "Payment data is required", null)
-                    return
+            }
+            "checkGooglePayAvailability" -> {
+                try {
+                    Log.d(TAG, "Checking Google Pay availability")
+                    // Pay package handles availability checks on Flutter side
+                    // This is a placeholder for future native availability checks
+                    result.success(true)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error checking Google Pay availability", e)
+                    result.error(
+                            "AVAILABILITY_CHECK_FAILED",
+                            "Failed to check availability: ${e.message}",
+                            null
+                    )
                 }
+            }
+            "tokenizeGooglePayData" -> {
+                try {
+                    Log.d(TAG, "Tokenizing Google Pay data")
 
-                googlePayTokenizer?.tokenizePaymentData(paymentData, result)
+                    if (googlePayTokenizer == null) {
+                        Log.e(TAG, "Google Pay tokenizer instance is null")
+                        result.error(
+                                "GOOGLEPAY_NOT_READY",
+                                "Google Pay tokenizer not initialized",
+                                null
+                        )
+                        return
+                    }
+
+                    @Suppress("UNCHECKED_CAST") val args = call.arguments as? Map<String, Any>
+
+                    if (args == null) {
+                        Log.e(TAG, "Tokenize: Missing arguments")
+                        result.error("INVALID_ARGS", "Payment data is required", null)
+                        return
+                    }
+
+                    val paymentData = args["paymentData"] as? String
+
+                    if (paymentData.isNullOrBlank()) {
+                        Log.e(TAG, "Tokenize: Payment data is empty")
+                        result.error("INVALID_ARGS", "Payment data cannot be empty", null)
+                        return
+                    }
+
+                    // Delegate to tokenizer (it will handle the result callback)
+                    googlePayTokenizer?.tokenizePaymentData(paymentData, result)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error tokenizing Google Pay data", e)
+                    result.error("TOKENIZATION_ERROR", "Failed to tokenize: ${e.message}", null)
+                }
+            }
+            "getGooglePaySessionData" -> {
+                try {
+                    Log.d(TAG, "Getting Google Pay session data")
+
+                    if (googlePayTokenizer == null) {
+                        Log.e(TAG, "Google Pay tokenizer instance is null")
+                        result.error(
+                                "GOOGLEPAY_NOT_READY",
+                                "Google Pay tokenizer not initialized",
+                                null
+                        )
+                        return
+                    }
+
+                    // Delegate to tokenizer (it will handle the result callback)
+                    googlePayTokenizer?.getGooglePaySessionData(result)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error getting Google Pay session data", e)
+                    result.error(
+                            "SESSION_DATA_ERROR",
+                            "Failed to get session data: ${e.message}",
+                            null
+                    )
+                }
             }
             else -> {
                 result.notImplemented()
@@ -129,7 +238,15 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
-        googlePayTokenizer?.dispose()
+        try {
+            Log.d(TAG, "Cleaning up resources")
+            googlePayTokenizer?.dispose()
+            cardPlatformView = null
+            googlePayPlatformView = null
+            googlePayTokenizer = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during cleanup", e)
+        }
         super.onDestroy()
     }
 }

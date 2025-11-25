@@ -1,5 +1,4 @@
-import 'dart:developer';
-
+import 'package:flow_flutter_new/utils/console_logger.dart';
 import 'package:flutter/services.dart';
 
 import '../models/payment_config.dart';
@@ -20,6 +19,9 @@ class PaymentBridge {
   Function(PaymentErrorResult)? onPaymentError;
   Function(String)? onSessionData;
 
+  // Track current payment type
+  String? _currentPaymentType; // 'card' or 'googlepay'
+
   /// Initialize the payment bridge and set up method call handler
   void initialize() {
     _channel.setMethodCallHandler(_handleMethodCall);
@@ -27,38 +29,78 @@ class PaymentBridge {
 
   /// Handle incoming calls from native platforms
   Future<dynamic> _handleMethodCall(MethodCall call) async {
-    log('📱 Received method call: ${call.method}');
+    ConsoleLogger.info('Received method call: ${call.method}');
 
     switch (call.method) {
       case 'cardTokenized':
-        final result = CardTokenResult.fromMap(
-          call.arguments as Map<String, dynamic>,
-        );
-        log('[Checkout]: ✅ Card tokenized: $result');
-        onCardTokenized?.call(result);
+        if (call.arguments == null) {
+          ConsoleLogger.error('cardTokenized arguments are null!');
+          return;
+        }
+
+        try {
+          // Convert from Map<Object?, Object?> to Map<String, dynamic>
+          final arguments = Map<String, dynamic>.from(call.arguments as Map);
+          final result = CardTokenResult.fromMap(arguments);
+          ConsoleLogger.success('Card tokenized successfully');
+          onCardTokenized?.call(result);
+        } catch (e) {
+          ConsoleLogger.error('Error parsing tokenized result: $e');
+        }
         break;
 
       case 'paymentSuccess':
         final result = PaymentSuccessResult.fromMap(call.arguments);
-        log('[Checkout]: ✅ Payment success: $result');
+        ConsoleLogger.success('Payment completed successfully');
         onPaymentSuccess?.call(result);
         break;
 
       case 'paymentError':
         final result = PaymentErrorResult.fromMap(call.arguments);
-        log('[Checkout]: ❌ Payment error: $result');
+        ConsoleLogger.error('Payment error: ${result.errorMessage}');
         onPaymentError?.call(result);
         break;
 
       case 'sessionDataReady':
-        final args = call.arguments as Map<String, dynamic>;
-        final result = args['sessionData'] as String;
-        log('[Checkout]: ✅ Session data: $result');
-        onSessionData?.call(result);
+        ConsoleLogger.debug('Processing sessionDataReady...');
+
+        if (call.arguments == null) {
+          ConsoleLogger.error('sessionDataReady arguments are null!');
+          return;
+        }
+
+        ConsoleLogger.debug('Arguments: ${call.arguments}');
+        ConsoleLogger.debug('Arguments type: ${call.arguments.runtimeType}');
+
+        try {
+          final args = Map<String, dynamic>.from(call.arguments as Map);
+
+          // sessionData is now a map, not a string
+          final sessionDataMap = args['sessionData'];
+
+          ConsoleLogger.debug('Session data map: $sessionDataMap');
+          ConsoleLogger.debug(
+            'Session data type: ${sessionDataMap.runtimeType}',
+          );
+
+          // Convert to string for the callback
+          final result = sessionDataMap.toString();
+
+          ConsoleLogger.success('Session data ready: $result');
+
+          if (onSessionData != null) {
+            ConsoleLogger.debug('Calling onSessionData callback');
+            onSessionData?.call(result);
+          } else {
+            ConsoleLogger.warning('onSessionData callback is null!');
+          }
+        } catch (e) {
+          ConsoleLogger.error('Error processing session data: $e');
+        }
         break;
 
       default:
-        log('⚠️ Unknown method: ${call.method}');
+        ConsoleLogger.warning('Unknown method: ${call.method}');
     }
   }
 
@@ -68,11 +110,17 @@ class PaymentBridge {
   Future<bool> initCardView(PaymentConfig config, CardConfig cardConfig) async {
     try {
       final params = {...config.toMap(), 'cardConfig': cardConfig.toMap()};
-
       final result = await _channel.invokeMethod('initCardView', params);
+
+      // Track that we're using card payment
+      if (result == true) {
+        _currentPaymentType = 'card';
+        ConsoleLogger.debug('Payment type set to: card');
+      }
+
       return result == true;
     } on PlatformException catch (e) {
-      log('[Checkout]: ❌ Init card view failed: ${e.message}');
+      ConsoleLogger.error('Init card view failed: ${e.message}');
       return false;
     }
   }
@@ -83,7 +131,7 @@ class PaymentBridge {
       final result = await _channel.invokeMethod<bool>('validateCard');
       return result ?? false;
     } on PlatformException catch (e) {
-      log('[Checkout]: ❌ Validate card failed: ${e.message}');
+      ConsoleLogger.error('Validate card failed: ${e.message}');
       return false;
     }
   }
@@ -91,11 +139,11 @@ class PaymentBridge {
   /// Tokenize the card (trigger from Flutter button)
   Future<void> tokenizeCard() async {
     try {
-      log('[Checkout]: 🔄 Requesting card tokenization...');
+      ConsoleLogger.payment('Requesting card tokenization...');
       await _channel.invokeMethod('tokenizeCard');
       // Result will come via onCardTokenized callback
     } on PlatformException catch (e) {
-      log('[Checkout]: ❌ Tokenize card failed: ${e.message}');
+      ConsoleLogger.error('Tokenize card failed: ${e.message}');
       onPaymentError?.call(
         PaymentErrorResult(
           errorCode: e.code,
@@ -105,13 +153,28 @@ class PaymentBridge {
     }
   }
 
-  Future<void> submit() async {
+  /// Submit payment - works for both card and Google Pay
+  /// Automatically determines which session data method to call based on payment type
+  Future<void> submit(String method) async {
     try {
-      log('[Checkout]: 🔄 Submitting...');
-      await _channel.invokeMethod('getSessionData');
-      // Result will come via onCardTokenized callback
+      ConsoleLogger.payment('Submitting payment...');
+
+      // Determine which session data method to call based on current payment type
+      if (method == 'googlepay') {
+        ConsoleLogger.debug('Calling Google Pay session data');
+        await _channel.invokeMethod('getGooglePaySessionData');
+      } else if (method == 'card') {
+        ConsoleLogger.debug('Calling card session data');
+        await _channel.invokeMethod('getSessionData');
+      } else {
+        // Default to card if type is unknown
+        ConsoleLogger.warning('Payment type unknown, defaulting to card');
+        await _channel.invokeMethod('getSessionData');
+      }
+
+      // Result will come via onSessionData callback
     } on PlatformException catch (e) {
-      log('[Checkout]: ❌ Submit failed: ${e.message}');
+      ConsoleLogger.error('Submit failed: ${e.message}');
       onPaymentError?.call(
         PaymentErrorResult(
           errorCode: e.code,
@@ -133,11 +196,17 @@ class PaymentBridge {
         ...config.toMap(),
         'googlePayConfig': googlePayConfig.toMap(),
       };
-
       final result = await _channel.invokeMethod('initGooglePay', params);
+
+      // Track that we're using Google Pay
+      if (result == true) {
+        _currentPaymentType = 'googlepay';
+        ConsoleLogger.debug('Payment type set to: googlepay');
+      }
+
       return result == true;
     } on PlatformException catch (e) {
-      log('[Checkout]: ❌ Init Google Pay failed: ${e.message}');
+      ConsoleLogger.error('Init Google Pay failed: ${e.message}');
       return false;
     }
   }
@@ -150,7 +219,7 @@ class PaymentBridge {
       );
       return result ?? false;
     } on PlatformException catch (e) {
-      log('[Checkout]: ❌ Check Google Pay availability failed: ${e.message}');
+      ConsoleLogger.error('Check Google Pay availability failed: ${e.message}');
       return false;
     }
   }
@@ -158,11 +227,11 @@ class PaymentBridge {
   /// Launch Google Pay payment sheet
   Future<void> launchGooglePaySheet(Map<String, dynamic> requestData) async {
     try {
-      log('[Checkout]: 🔄 Launching Google Pay sheet...');
+      ConsoleLogger.payment('Launching Google Pay sheet...');
       await _channel.invokeMethod('launchGooglePaySheet', requestData);
       // Result will come via callbacks
     } on PlatformException catch (e) {
-      log('[Checkout]: ❌ Launch Google Pay failed: ${e.message}');
+      ConsoleLogger.error('Launch Google Pay failed: ${e.message}');
       onPaymentError?.call(
         PaymentErrorResult(
           errorCode: e.code,
@@ -175,17 +244,34 @@ class PaymentBridge {
   /// Tokenize Google Pay payment data using Checkout SDK
   Future<void> tokenizeGooglePayData(String paymentData) async {
     try {
-      log('[Checkout]: 🔄 Tokenizing Google Pay data...');
+      ConsoleLogger.payment('Tokenizing Google Pay data...');
       await _channel.invokeMethod('tokenizeGooglePayData', {
         'paymentData': paymentData,
       });
       // Token will come via cardTokenized callback
     } on PlatformException catch (e) {
-      log('[Checkout]: ❌ Google Pay tokenization failed: ${e.message}');
+      ConsoleLogger.error('Google Pay tokenization failed: ${e.message}');
       onPaymentError?.call(
         PaymentErrorResult(
           errorCode: e.code,
           errorMessage: e.message ?? 'Google Pay tokenization failed',
+        ),
+      );
+    }
+  }
+
+  /// Get Google Pay session data
+  Future<void> getGooglePaySessionData() async {
+    try {
+      ConsoleLogger.payment('Getting Google Pay session data...');
+      await _channel.invokeMethod('getGooglePaySessionData');
+      // Session data will come via sessionDataReady callback
+    } on PlatformException catch (e) {
+      ConsoleLogger.error('Get Google Pay session data failed: ${e.message}');
+      onPaymentError?.call(
+        PaymentErrorResult(
+          errorCode: e.code,
+          errorMessage: e.message ?? 'Failed to get session data',
         ),
       );
     }
@@ -198,7 +284,17 @@ class PaymentBridge {
     onCardTokenized = null;
     onPaymentSuccess = null;
     onPaymentError = null;
+    onSessionData = null;
   }
+
+  /// Clear payment type tracker
+  void clearPaymentType() {
+    _currentPaymentType = null;
+    ConsoleLogger.debug('Payment type cleared');
+  }
+
+  /// Get current payment type
+  String? get currentPaymentType => _currentPaymentType;
 
   /// Dispose resources
   void dispose() {

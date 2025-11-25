@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flow_flutter_new/utils/console_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,9 +12,12 @@ import 'models/payment_config.dart';
 import 'models/payment_result.dart';
 import 'services/payment_bridge.dart';
 
+// Debug flag - set to false in production
+const bool _enableDebugLogging = kDebugMode;
+
 // Google Pay Configuration
-const String paymentSessionId = 'ps_35wCHgsxgeZBc8QHGtl7Y3tiTSN';
-const String paymentSessionSecret = 'pss_c089f9cc-236b-4f9b-a139-adc863c96113';
+const String paymentSessionId = 'ps_35xrq6XPMs6AvEOw0GOYKy8fxvH';
+const String paymentSessionSecret = 'pss_44c2ca4c-9769-464c-bbb6-12e27e3d2752';
 const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 const String envMode = 'TEST';
 const String currency = 'SAR';
@@ -83,102 +88,159 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _handleCardTokenized(CardTokenResult result) {
     setState(() => _isProcessing = false);
-    _showResultDialog(
-      'Card Tokenized',
-      'Token: ${result.token}\n'
+
+    // Optional debug logging (only in debug mode)
+    if (_enableDebugLogging) {
+      ConsoleLogger.success(
+        'Token received - Type: ${result.type}, Network: ${result.cardNetwork ?? result.scheme}',
+      );
+    }
+
+    // Build a more detailed message based on payment type
+    String message;
+    if (result.type?.toLowerCase() == 'googlepay') {
+      // Google Pay tokenization
+      message =
+          'Payment Method: Google Pay\n'
+          'Token: ${result.token}\n'
+          'Card Network: ${result.cardNetwork ?? result.scheme ?? 'N/A'}';
+
+      if (result.last4 != null && result.last4!.isNotEmpty) {
+        message += '\nLast 4 Digits: ${result.last4}';
+      }
+    } else {
+      // Card tokenization
+      message =
+          'Payment Method: Card\n'
+          'Token: ${result.token}\n'
           'Last 4: ${result.last4 ?? 'N/A'}\n'
           'Brand: ${result.brand ?? 'N/A'}\n'
-          'Expiry: ${result.expiryMonth ?? 'N/A'}/${result.expiryYear ?? 'N/A'}',
-      isSuccess: true,
-    );
+          'Expiry: ${result.expiryMonth ?? 'N/A'}/${result.expiryYear ?? 'N/A'}';
+    }
+
+    ConsoleLogger.success(message);
   }
 
   void _handlePaymentSuccess(PaymentSuccessResult result) {
     setState(() => _isProcessing = false);
-    _showResultDialog(
-      'Payment Successful',
-      'Payment ID: ${result.paymentId}',
-      isSuccess: true,
-    );
+
+    ConsoleLogger.success('Payment ID: ${result.paymentId}');
   }
 
   void _handlePaymentError(PaymentErrorResult result) {
     setState(() => _isProcessing = false);
-    _showResultDialog(
-      'Payment Error',
-      'Error: ${result.errorMessage}\nCode: ${result.errorCode}',
-      isSuccess: false,
+
+    if (_enableDebugLogging) {
+      ConsoleLogger.error(
+        'Payment error: ${result.errorCode} - ${result.errorMessage}',
+      );
+    }
+
+    // Provide user-friendly error messages based on error codes
+    final userMessage = _getUserFriendlyErrorMessage(
+      result.errorCode,
+      result.errorMessage,
     );
+
+    ConsoleLogger.error('Payment Error: $userMessage');
+  }
+
+  /// Convert technical error codes to user-friendly messages
+  String _getUserFriendlyErrorMessage(
+    String errorCode,
+    String technicalMessage,
+  ) {
+    switch (errorCode) {
+      case 'INVALID_CONFIG':
+        return 'Payment configuration error. Please contact support.';
+      case 'GOOGLEPAY_UNAVAILABLE':
+      case 'GOOGLEPAY_NOT_AVAILABLE':
+        return 'Google Pay is not available on this device. Please use another payment method.';
+      case 'INITIALIZATION_FAILED':
+      case 'INIT_ERROR':
+        return 'Failed to initialize payment. Please try again.';
+      case 'TOKENIZATION_FAILED':
+      case 'TOKENIZATION_ERROR':
+        return 'Payment processing failed. Please try again or use another payment method.';
+      case 'TIMEOUT':
+        return 'Payment request timed out. Please check your connection and try again.';
+      case 'INVALID_STATE':
+        return 'Payment system not ready. Please wait a moment and try again.';
+      case 'PAYMENT_ERROR':
+        return 'Payment failed: $technicalMessage';
+      default:
+        return 'An error occurred: $technicalMessage';
+    }
   }
 
   void _handleSessionData(String result) {
     setState(() => _isProcessing = false);
-    _showResultDialog(
-      'Session Data Retrieved',
-      'Session Data received - ready to send to backend',
-      isSuccess: true,
-    );
+    ConsoleLogger.success('Session Data: $result');
   }
 
-  void _showResultDialog(
-    String title,
-    String message, {
-    required bool isSuccess,
-  }) {
-    showDialog(
-      context: context,
-      builder:
-          (_) => AlertDialog(
-            title: Row(
-              children: [
-                Icon(
-                  isSuccess ? Icons.check_circle : Icons.error,
-                  color: isSuccess ? Colors.green : Colors.red,
-                ),
-                const SizedBox(width: 8),
-                Expanded(child: Text(title)),
-              ],
-            ),
-            content: SingleChildScrollView(child: Text(message)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-    );
+  Future<void> _getSessionData(String method) async {
+    setState(() => _isProcessing = true);
+    await _paymentBridge.submit(method);
+    setState(() => _isProcessing = false);
   }
 
   void _showCardSheet() async {
-    await _paymentBridge.initGooglePay(
-      _paymentConfig,
-      GooglePayConfig(
-        merchantId: publicKey,
-        merchantName: 'Mac Queen',
-        countryCode: 'SA',
-        currencyCode: currency,
-        totalPrice: totalPrice.toInt(),
-      ),
-    );
+    try {
+      debugPrint('[PaymentScreen] Initializing Google Pay for card sheet');
 
-    if (!mounted) return;
+      final success = await _paymentBridge.initGooglePay(
+        _paymentConfig,
+        GooglePayConfig(
+          merchantId: publicKey,
+          merchantName: 'Mac Queen',
+          countryCode: 'SA',
+          currencyCode: currency,
+          totalPrice: totalPrice.toInt(),
+        ),
+      );
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder:
-          (context) => _CardBottomSheet(
-            paymentConfig: _paymentConfig,
-            onProcessing: (processing) {
-              setState(() => _isProcessing = processing);
-            },
-            onInitialized: () {
-              // No longer setting _cardInitialized
-            },
+      if (!success) {
+        debugPrint('[PaymentScreen] Failed to initialize Google Pay');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to initialize payment system'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder:
+            (context) => _CardBottomSheet(
+              paymentConfig: _paymentConfig,
+              onProcessing: (processing) {
+                setState(() => _isProcessing = processing);
+              },
+              onInitialized: () {
+                // No longer setting _cardInitialized
+              },
+            ),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[PaymentScreen] Error showing card sheet: $e');
+      debugPrint('[PaymentScreen] Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open payment sheet: $e'),
+            backgroundColor: Colors.red,
           ),
-    );
+        );
+      }
+    }
   }
 
   @override
@@ -219,6 +281,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
               onProcessing: (processing) {
                 setState(() => _isProcessing = processing);
               },
+            ),
+
+            const SizedBox(height: 50),
+            //Submit Button
+            ElevatedButton(
+              onPressed: () => _getSessionData('card'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Submit'),
             ),
 
             if (_isProcessing) ...[
@@ -333,9 +406,10 @@ class _GooglePayButtonState extends State<_GooglePayButton> {
   }
 
   Future<void> _initializeGooglePayTokenizer() async {
-    // Initialize the Checkout SDK Google Pay tokenizer
     try {
-      await widget.paymentBridge.initGooglePay(
+      debugPrint('[GooglePayButton] Initializing Google Pay tokenizer');
+
+      final success = await widget.paymentBridge.initGooglePay(
         widget.paymentConfig,
         GooglePayConfig(
           merchantId: publicKey,
@@ -345,28 +419,88 @@ class _GooglePayButtonState extends State<_GooglePayButton> {
           totalPrice: totalPrice.toInt(),
         ),
       );
-      setState(() => _isInitialized = true);
-    } catch (e) {
-      debugPrint('Failed to initialize Google Pay tokenizer: $e');
+
+      if (success) {
+        setState(() => _isInitialized = true);
+        debugPrint(
+          '[GooglePayButton] Google Pay tokenizer initialized successfully',
+        );
+      } else {
+        debugPrint(
+          '[GooglePayButton] Failed to initialize Google Pay tokenizer',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Google Pay is not available'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[GooglePayButton] Error initializing Google Pay: $e');
+      debugPrint('[GooglePayButton] Stack trace: $stackTrace');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to initialize Google Pay: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   void _onGooglePayResult(Map<String, dynamic> result) async {
     widget.onProcessing(true);
+    debugPrint('[GooglePayButton] Received Google Pay result');
 
     try {
+      // Validate result
+      if (result.isEmpty) {
+        throw Exception('Empty payment result received');
+      }
+
       // Extract payment data
       final paymentData = json.encode(result);
+      debugPrint('[GooglePayButton] Sending payment data for tokenization');
 
-      // Send to native platform for Checkout SDK tokenization
-      await widget.paymentBridge.tokenizeGooglePayData(paymentData);
+      // Send to native platform for Checkout SDK tokenization with timeout
+      await widget.paymentBridge
+          .tokenizeGooglePayData(paymentData)
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException('Tokenization timed out after 30 seconds');
+            },
+          );
 
+      debugPrint('[GooglePayButton] Payment data sent successfully');
       widget.onProcessing(false);
-    } catch (e) {
+      // Note: Actual result will come via callback
+    } on TimeoutException catch (e) {
+      debugPrint('[GooglePayButton] Timeout error: $e');
       widget.onProcessing(false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Payment processing failed: $e')),
+          const SnackBar(
+            content: Text('Payment request timed out. Please try again.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[GooglePayButton] Payment processing error: $e');
+      debugPrint('[GooglePayButton] Stack trace: $stackTrace');
+      widget.onProcessing(false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Payment processing failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -435,7 +569,7 @@ class _GooglePayButtonState extends State<_GooglePayButton> {
 }
 
 // Card Bottom Sheet
-class _CardBottomSheet extends StatelessWidget {
+class _CardBottomSheet extends StatefulWidget {
   final PaymentConfig paymentConfig;
   final Function(bool) onProcessing;
   final VoidCallback onInitialized;
@@ -447,6 +581,45 @@ class _CardBottomSheet extends StatelessWidget {
   });
 
   @override
+  State<_CardBottomSheet> createState() => _CardBottomSheetState();
+}
+
+class _CardBottomSheetState extends State<_CardBottomSheet> {
+  final PaymentBridge _paymentBridge = PaymentBridge();
+  bool _isProcessing = false;
+
+  Future<void> _tokenizeCard() async {
+    setState(() => _isProcessing = true);
+    widget.onProcessing(true);
+
+    // Validate card first
+    final isValid = await _paymentBridge.validateCard();
+
+    if (!isValid) {
+      setState(() => _isProcessing = false);
+      widget.onProcessing(false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please check your card details'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+
+      return;
+    }
+
+    // Trigger tokenization
+    await _paymentBridge.tokenizeCard();
+    // The _isProcessing state will be reset by the callback in parent
+
+    setState(() => _isProcessing = false);
+    widget.onProcessing(false);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
@@ -454,7 +627,9 @@ class _CardBottomSheet extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        left: 16,
+        right: 16,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -482,7 +657,30 @@ class _CardBottomSheet extends StatelessWidget {
           // Card view
           SizedBox(
             height: 350,
-            child: _PlatformCardView(paymentConfig: paymentConfig),
+            child: _PlatformCardView(paymentConfig: widget.paymentConfig),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Tokenize Button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _tokenizeCard,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 2,
+              ),
+              child: const Text(
+                'Tokenize Card',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
           ),
         ],
       ),

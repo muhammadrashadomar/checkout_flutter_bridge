@@ -18,6 +18,8 @@ class CardTokenResult {
   final Map<String, dynamic>? billingAddress;
   final Map<String, dynamic>? phone;
   final String? name;
+  final String? brand; // Card brand
+  final String? cardNetwork; // Card network for Google Pay
   final Map<String, dynamic>? rawData;
 
   CardTokenResult({
@@ -39,38 +41,54 @@ class CardTokenResult {
     this.billingAddress,
     this.phone,
     this.name,
+    this.cardNetwork,
+    this.brand, // Add to constructor
     this.rawData,
   });
 
   factory CardTokenResult.fromMap(Map<String, dynamic> map) {
-    // Handle nested tokenDetails structure
-    final tokenDetails = map['tokenDetails'] as Map<String, dynamic>?;
+    // Handle nested tokenDetails structure (from card component)
+    // Need to convert Map<Object?, Object?> to Map<String, dynamic>
+    final tokenDetailsRaw = map['tokenDetails'];
+    final tokenDetails =
+        tokenDetailsRaw != null
+            ? Map<String, dynamic>.from(tokenDetailsRaw as Map)
+            : null;
+
+    // If tokenDetails exists, use it; otherwise use direct map (Google Pay)
+    final data = tokenDetails ?? map;
+
+    // Helper to safely convert nested maps
+    Map<String, dynamic>? convertMap(dynamic value) {
+      if (value == null) return null;
+      if (value is Map) return Map<String, dynamic>.from(value);
+      return null;
+    }
 
     return CardTokenResult(
-      token: tokenDetails?['token'] as String? ?? '',
-      last4: tokenDetails?['last4'] as String?,
-      bin: tokenDetails?['bin'] as String?,
-      scheme: tokenDetails?['scheme'] as String?,
-      schemeLocal: tokenDetails?['schemeLocal'] as String?,
-      expiryMonth: tokenDetails?['expiryMonth'] as int?,
-      expiryYear: tokenDetails?['expiryYear'] as int?,
-      expiresOn: tokenDetails?['expiresOn'] as String?,
-      type: tokenDetails?['type'] as String?,
-      cardType: tokenDetails?['cardType'] as String?,
-      cardCategory: tokenDetails?['cardCategory'] as String?,
-      issuer: tokenDetails?['issuer'] as String?,
-      issuerCountry: tokenDetails?['issuerCountry'] as String?,
-      productId: tokenDetails?['productId'] as String?,
-      productType: tokenDetails?['productType'] as String?,
-      billingAddress: tokenDetails?['billingAddress'] as Map<String, dynamic>?,
-      phone: tokenDetails?['phone'] as Map<String, dynamic>?,
-      name: tokenDetails?['name'] as String?,
-      rawData: tokenDetails,
+      token: data['token'] as String? ?? map['token'] as String? ?? '',
+      last4: data['last4'] as String?,
+      bin: data['bin'] as String?,
+      scheme: data['scheme'] as String?,
+      schemeLocal: data['schemeLocal'] as String?,
+      expiryMonth: data['expiryMonth'] as int?,
+      expiryYear: data['expiryYear'] as int?,
+      expiresOn: data['expiresOn'] as String?,
+      type: data['type'] as String?,
+      cardType: data['cardType'] as String?,
+      cardCategory: data['cardCategory'] as String?,
+      issuer: data['issuer'] as String?,
+      issuerCountry: data['issuerCountry'] as String?,
+      productId: data['productId'] as String?,
+      productType: data['productType'] as String?,
+      billingAddress: convertMap(data['billingAddress']),
+      phone: convertMap(data['phone']),
+      name: data['name'] as String?,
+      brand: data['brand'] as String?, // Add brand field
+      cardNetwork: data['cardNetwork'] as String?, // Google Pay card network
+      rawData: tokenDetails ?? data,
     );
   }
-
-  /// Convenience getter for brand (alias for scheme)
-  String? get brand => scheme;
 
   @override
   String toString() {
