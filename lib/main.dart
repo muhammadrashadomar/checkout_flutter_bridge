@@ -16,12 +16,14 @@ import 'services/payment_bridge.dart';
 const bool _enableDebugLogging = kDebugMode;
 
 // Google Pay Configuration
-const String paymentSessionId = 'ps_35xrq6XPMs6AvEOw0GOYKy8fxvH';
-const String paymentSessionSecret = 'pss_44c2ca4c-9769-464c-bbb6-12e27e3d2752';
+const String paymentSessionId = 'ps_35yfyWifVDMIRmbpdVrsBy5Gwb6';
+const String paymentSessionSecret = 'pss_5345e898-e2d5-48ed-84fa-ce2d8b12fbf0';
 const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 const String envMode = 'TEST';
 const String currency = 'SAR';
 const double totalPrice = 10.00;
+
+//* Create a new payment session every time the open the card sheet
 
 void main() {
   runApp(const MyApp());
@@ -54,7 +56,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _isProcessing = false;
 
   // Payment configuration
-  final PaymentConfig _paymentConfig = PaymentConfig(
+  PaymentConfig get _paymentConfig => PaymentConfig(
     paymentSessionId: paymentSessionId,
     paymentSessionSecret: paymentSessionSecret,
     publicKey: publicKey,
@@ -713,6 +715,6 @@ class _PlatformCardView extends StatelessWidget {
       );
     }
 
-    return const Center(child: Text('Platform not supported'));
+    return const SizedBox.shrink();
   }
 }
