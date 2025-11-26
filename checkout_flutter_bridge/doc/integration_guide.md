@@ -23,7 +23,7 @@ dependencies:
     # Or use git:
     # checkout_flutter_bridge:
     #   git:
-    #     url: https://github.com/your-repo/checkout_flutter_bridge.git
+    #     url: https://github.com/muhammadrashadomar/checkout_flutter_bridge.git
     #     ref: main
 ```
 
