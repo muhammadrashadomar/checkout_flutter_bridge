@@ -24,6 +24,7 @@ dependencies:
     # checkout_flutter_bridge:
     #   git:
     #     url: https://github.com/muhammadrashadomar/checkout_flutter_bridge.git
+    #     path: checkout_flutter_bridge
     #     ref: main
 ```
 
