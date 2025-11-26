@@ -23,7 +23,15 @@ rootProject.allprojects {
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
-apply plugin: 'org.jetbrains.kotlin.plugin.compose' // ← REQUIRED for Kotlin 2.0+
+// Note: Applying the Kotlin Compose Gradle plugin here can cause "Plugin with id
+// 'org.jetbrains.kotlin.plugin.compose' not found" errors when this package is added
+// as a git/pub dependency to an external project that doesn't provide the plugin
+// resolution. Compose is enabled below via `buildFeatures { compose = true }` and
+// the required Compose runtime/compiler should be provided by the consuming app.
+// If you intentionally need the Kotlin Compose Gradle plugin, enable it in the
+// consuming application's pluginManagement or remove this comment and re-enable
+// the line below.
+// apply plugin: 'org.jetbrains.kotlin.plugin.compose' // ← REQUIRED for Kotlin 2.0+
 
 android {
     compileSdk 35

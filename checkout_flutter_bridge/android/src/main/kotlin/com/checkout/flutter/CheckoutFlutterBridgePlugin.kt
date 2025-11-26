@@ -18,6 +18,7 @@ import io.flutter.plugin.common.MethodChannel.Result
  */
 class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private lateinit var channel: MethodChannel
+    private var flutterPluginBinding: FlutterPlugin.FlutterPluginBinding? = null
     private var activity: ComponentActivity? = null
     private var cardPlatformView: CardPlatformView? = null
     private var googlePayPlatformView: GooglePayPlatformView? = null
@@ -31,26 +32,41 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         Log.d(TAG, "Plugin attached to engine")
 
+        // Store the binding for later use when activity is attached
+        this.flutterPluginBinding = flutterPluginBinding
+
         val messenger = flutterPluginBinding.binaryMessenger
         channel = MethodChannel(messenger, CHANNEL)
         channel.setMethodCallHandler(this)
 
+        // Platform views will be registered when activity is attached
+        Log.d(TAG, "Waiting for activity to register platform views")
+    }
+
+    private fun registerPlatformViews() {
+        val binding = flutterPluginBinding ?: return
+        val currentActivity = activity ?: return
+
+        Log.d(TAG, "Registering platform views with activity")
+
         // Register platform views
-        flutterPluginBinding.platformViewRegistry.registerViewFactory(
+        binding.platformViewRegistry.registerViewFactory(
                 "flow_card_view",
-                CardViewFactory(messenger, activity!!) { view ->
+                CardViewFactory(binding.binaryMessenger, currentActivity) { view ->
                     cardPlatformView = view
                     Log.d(TAG, "Card view instance captured")
                 }
         )
 
-        flutterPluginBinding.platformViewRegistry.registerViewFactory(
+        binding.platformViewRegistry.registerViewFactory(
                 "flow_googlepay_view",
-                GooglePayViewFactory(messenger, activity!!) { view ->
+                GooglePayViewFactory(binding.binaryMessenger, currentActivity) { view ->
                     googlePayPlatformView = view
                     Log.d(TAG, "Google Pay view instance captured")
                 }
         )
+
+        Log.d(TAG, "Platform views registered successfully")
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -221,6 +237,9 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
         activity =
                 binding.activity as? ComponentActivity
                         ?: throw IllegalStateException("Activity must be a ComponentActivity")
+
+        // Now that we have the activity, register platform views
+        registerPlatformViews()
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
@@ -246,6 +265,7 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
             cardPlatformView = null
             googlePayPlatformView = null
             googlePayTokenizer = null
+            flutterPluginBinding = null
         } catch (e: Exception) {
             Log.e(TAG, "Error during cleanup", e)
         }
