@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flow_flutter_new/models/saved_card_config.dart';
 import 'package:flow_flutter_new/utils/console_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,23 @@ const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 const String envMode = 'TEST';
 const String currency = 'SAR';
 const double totalPrice = 10.00;
+
+// Payment configuration
+final _paymentConfig = PaymentConfig(
+  paymentSessionId: paymentSessionId,
+  paymentSessionSecret: paymentSessionSecret,
+  publicKey: publicKey,
+  environment: PaymentEnvironment.sandbox,
+  appearance: AppearanceConfig(
+    borderRadius: 8,
+    colorTokens: ColorTokens(
+      colorAction: 0XFF00639E,
+      colorPrimary: 0XFF111111,
+      colorBorder: 0XFFCCCCCC,
+      colorFormBorder: 0XFFCCCCCC,
+    ),
+  ),
+);
 
 //* Create a new payment session every time the open the card sheet
 
@@ -55,23 +73,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   bool _isProcessing = false;
 
-  // Payment configuration
-  PaymentConfig get _paymentConfig => PaymentConfig(
-    paymentSessionId: paymentSessionId,
-    paymentSessionSecret: paymentSessionSecret,
-    publicKey: publicKey,
-    environment: PaymentEnvironment.sandbox,
-    appearance: AppearanceConfig(
-      borderRadius: 8,
-      colorTokens: ColorTokens(
-        colorAction: 0XFF00639E,
-        colorPrimary: 0XFF111111,
-        colorBorder: 0XFFCCCCCC,
-        colorFormBorder: 0XFFCCCCCC,
-      ),
-    ),
-  );
-
   @override
   void initState() {
     super.initState();
@@ -92,11 +93,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _isProcessing = false);
 
     // Optional debug logging (only in debug mode)
-    if (_enableDebugLogging) {
-      ConsoleLogger.success(
-        'Token received - Type: ${result.type}, Network: ${result.cardNetwork ?? result.scheme}',
-      );
-    }
+
+    ConsoleLogger.success(
+      'Token received - Type: ${result.type}, Network: ${result.cardNetwork ?? result.scheme}',
+    );
 
     // Build a more detailed message based on payment type
     String message;
@@ -187,62 +187,47 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   void _showCardSheet() async {
-    try {
-      debugPrint('[PaymentScreen] Initializing Google Pay for card sheet');
-
-      final success = await _paymentBridge.initGooglePay(
-        _paymentConfig,
-        GooglePayConfig(
-          merchantId: publicKey,
-          merchantName: 'Mac Queen',
-          countryCode: 'SA',
-          currencyCode: currency,
-          totalPrice: totalPrice.toInt(),
-        ),
-      );
-
-      if (!success) {
-        debugPrint('[PaymentScreen] Failed to initialize Google Pay');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to initialize payment system'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
-      if (!mounted) return;
-
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder:
-            (context) => _CardBottomSheet(
-              paymentConfig: _paymentConfig,
-              onProcessing: (processing) {
-                setState(() => _isProcessing = processing);
-              },
-              onInitialized: () {
-                // No longer setting _cardInitialized
-              },
-            ),
-      );
-    } catch (e, stackTrace) {
-      debugPrint('[PaymentScreen] Error showing card sheet: $e');
-      debugPrint('[PaymentScreen] Stack trace: $stackTrace');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to open payment sheet: $e'),
-            backgroundColor: Colors.red,
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => _CardBottomSheet(
+            paymentConfig: _paymentConfig,
+            onProcessing: (processing) {
+              setState(() => _isProcessing = processing);
+            },
+            onInitialized: () {},
           ),
-        );
-      }
-    }
+    );
+  }
+
+  void _showSavedCardSheet() async {
+    // Example saved card - in production, fetch from backend
+    // The paymentSourceId should be the Checkout.com source ID from previous tokenization
+    final savedCard = SavedCardConfig(
+      paymentSourceId:
+          'src_test_example', // TODO: Replace with real source ID from backend
+      last4: '4242',
+      scheme: 'visa',
+      expiryMonth: 12,
+      expiryYear: 2025,
+      cardholderName: 'John Doe',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => _SavedCardBottomSheet(
+            paymentConfig: _paymentConfig,
+            savedCardConfig: savedCard,
+            onProcessing: (processing) {
+              setState(() => _isProcessing = processing);
+            },
+          ),
+    );
   }
 
   @override
@@ -276,6 +261,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
             const SizedBox(height: 16),
 
+            // Saved Card Payment Button
+            _PaymentMethodButton(
+              icon: Icons.credit_card_outlined,
+              label: 'Pay with Saved Card',
+              description: 'Visa •••• 4242 - Enter CVV only',
+              onTap: _showSavedCardSheet,
+              color: Colors.green,
+            ),
+            const SizedBox(height: 16),
+
             // Google Pay Button
             _GooglePayButton(
               paymentBridge: _paymentBridge,
@@ -286,7 +281,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
 
             const SizedBox(height: 50),
-            //Submit Button
+            //! Submit Button ---------------------------------------------
             ElevatedButton(
               onPressed: () => _getSessionData('card'),
               style: ElevatedButton.styleFrom(
@@ -588,17 +583,14 @@ class _CardBottomSheet extends StatefulWidget {
 
 class _CardBottomSheetState extends State<_CardBottomSheet> {
   final PaymentBridge _paymentBridge = PaymentBridge();
-  bool _isProcessing = false;
 
   Future<void> _tokenizeCard() async {
-    setState(() => _isProcessing = true);
     widget.onProcessing(true);
 
     // Validate card first
     final isValid = await _paymentBridge.validateCard();
 
     if (!isValid) {
-      setState(() => _isProcessing = false);
       widget.onProcessing(false);
 
       if (mounted) {
@@ -617,7 +609,6 @@ class _CardBottomSheetState extends State<_CardBottomSheet> {
     await _paymentBridge.tokenizeCard();
     // The _isProcessing state will be reset by the callback in parent
 
-    setState(() => _isProcessing = false);
     widget.onProcessing(false);
   }
 
@@ -680,6 +671,198 @@ class _CardBottomSheetState extends State<_CardBottomSheet> {
               ),
               child: const Text(
                 'Tokenize Card',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Saved Card Bottom Sheet
+class _SavedCardBottomSheet extends StatefulWidget {
+  final PaymentConfig paymentConfig;
+  final SavedCardConfig savedCardConfig;
+  final Function(bool) onProcessing;
+
+  const _SavedCardBottomSheet({
+    required this.paymentConfig,
+    required this.savedCardConfig,
+    required this.onProcessing,
+  });
+
+  @override
+  State<_SavedCardBottomSheet> createState() => _SavedCardBottomSheetState();
+}
+
+class _SavedCardBottomSheetState extends State<_SavedCardBottomSheet> {
+  final PaymentBridge _paymentBridge = PaymentBridge();
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeStoredCard();
+  }
+
+  Future<void> _initializeStoredCard() async {
+    try {
+      final success = await _paymentBridge.initStoredCardView(
+        widget.paymentConfig,
+        widget.savedCardConfig,
+      );
+
+      if (success && mounted) {
+        setState(() => _isInitialized = true);
+      } else if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to initialize saved card'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error initializing saved card: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    }
+  }
+
+  Future<void> _tokenizeSavedCard() async {
+    widget.onProcessing(true);
+
+    // Trigger tokenization (no validation needed - just CVV)
+    await _paymentBridge.tokenizeSavedCard();
+
+    widget.onProcessing(false);
+  }
+
+  String _getCardIcon(String scheme) {
+    switch (scheme.toLowerCase()) {
+      case 'visa':
+        return '💳';
+      case 'mastercard':
+        return '💳';
+      case 'amex':
+        return '💳';
+      default:
+        return '💳';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        left: 16,
+        right: 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Title
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Saved Card Payment',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ),
+
+          // Saved Card Info
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  _getCardIcon(widget.savedCardConfig.scheme),
+                  style: const TextStyle(fontSize: 32),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${widget.savedCardConfig.scheme.toUpperCase()} •••• ${widget.savedCardConfig.last4}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Expires ${widget.savedCardConfig.expiryMonth}/${widget.savedCardConfig.expiryYear}',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // CVV Input (rendered by SDK)
+          if (_isInitialized)
+            SizedBox(
+              height: 200,
+              child: _PlatformCardView(paymentConfig: widget.paymentConfig),
+            )
+          else
+            const SizedBox(
+              height: 200,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+
+          const SizedBox(height: 16),
+
+          // Tokenize Button
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _isInitialized ? _tokenizeSavedCard : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 2,
+              ),
+              child: const Text(
+                'Pay with Saved Card',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ),

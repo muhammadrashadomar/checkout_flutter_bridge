@@ -55,7 +55,15 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
         @Volatile private var isInitialized = false
 
         init {
-                initializeCardComponent(args)
+                // Detect component type from arguments
+                val params = args as? Map<*, *> ?: emptyMap<String, Any>()
+                val hasSavedCardConfig = params.containsKey("savedCardConfig")
+
+                if (hasSavedCardConfig) {
+                        initializeStoredCardComponent(args)
+                } else {
+                        initializeCardComponent(args)
+                }
         }
 
         /* Initialize card component with configuration from Flutter */
@@ -267,6 +275,160 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                                 ),
                                 ),
                 )
+        }
+
+        /* Initialize stored card component with saved card configuration */
+        private fun initializeStoredCardComponent(args: Any?) {
+                val params = args as? Map<*, *> ?: emptyMap<String, Any>()
+
+                // Extract required parameters
+                val sessionId = params["paymentSessionID"] as? String ?: ""
+                val sessionSecret = params["paymentSessionSecret"] as? String ?: ""
+                val publicKey = params["publicKey"] as? String ?: ""
+                val environmentStr = params["environment"] as? String ?: "sandbox"
+
+                // Extract saved card configuration
+                val savedCardConfig = params["savedCardConfig"] as? Map<*, *>
+                val paymentSourceId = savedCardConfig?.get("paymentSourceId") as? String ?: ""
+                val last4 = savedCardConfig?.get("last4") as? String ?: ""
+                val scheme = savedCardConfig?.get("scheme") as? String ?: ""
+                val expiryMonth = (savedCardConfig?.get("expiryMonth") as? Number)?.toInt() ?: 1
+                val expiryYear = (savedCardConfig?.get("expiryYear") as? Number)?.toInt() ?: 2025
+
+                // Validate required parameters
+                if (sessionId.isEmpty() || sessionSecret.isEmpty() || publicKey.isEmpty()) {
+                        sendError("INIT_ERROR", "Missing required payment session parameters")
+                        return
+                }
+
+                if (paymentSourceId.isEmpty()) {
+                        sendError(
+                                "INIT_ERROR",
+                                "Missing payment source ID - required for saved card CVV-only input"
+                        )
+                        return
+                }
+
+                Log.d(
+                        "CardPlatformView",
+                        "Initializing stored card with source ID: $paymentSourceId"
+                )
+
+                // Parse environment
+                val environment =
+                        when (environmentStr.lowercase()) {
+                                "production" -> Environment.PRODUCTION
+                                else -> Environment.SANDBOX
+                        }
+
+                // Parse appearance configuration
+                val appearance = params["appearance"] as? Map<*, *>
+                val designTokens = buildDesignTokens(appearance)
+
+                // Build component callback (same as card component)
+                val componentCallback =
+                        ComponentCallback(
+                                onReady = { component ->
+                                        Log.d(
+                                                "CardPlatformView",
+                                                "Stored card component ready: ${component.name}"
+                                        )
+                                },
+                                handleSubmit = { sessionData ->
+                                        Log.d(
+                                                "CardPlatformView",
+                                                "handleSubmit called with sessionData: $sessionData"
+                                        )
+                                        sendSessionData(sessionData)
+                                        ApiCallResult.Failure
+                                },
+                                onSubmit = { component ->
+                                        Log.d(
+                                                "CardPlatformView",
+                                                "Component submitted: ${component.name}"
+                                        )
+                                },
+                                onSuccess = { _, paymentID -> sendPaymentSuccess(paymentID) },
+                                onTokenized = { result ->
+                                        sendCardTokenized(result.data)
+                                        CallbackResult.Accepted
+                                },
+                                onError = { _, checkoutError ->
+                                        Log.e("CardPlatformView", "Error: ${checkoutError.message}")
+                                        sendError(
+                                                checkoutError.code.toString(),
+                                                checkoutError.message
+                                        )
+                                },
+                        )
+
+                // Build component options for stored card (uses Card component)
+                val componentOption =
+                        ComponentOption(
+                                showPayButton = false,
+                                paymentButtonAction = PaymentButtonAction.TOKENIZE,
+                        )
+
+                // NOTE: Checkout SDK doesn't have explicit StoredCard type
+                // We use Card component which will render CVV-only input for stored cards
+                val componentOptionsMap = mapOf(PaymentMethodName.Card to componentOption)
+
+                // Build configuration
+                val configuration =
+                        CheckoutComponentConfiguration(
+                                context = activity,
+                                paymentSession =
+                                        PaymentSessionResponse(
+                                                id = sessionId,
+                                                secret = sessionSecret
+                                        ),
+                                publicKey = publicKey,
+                                environment = environment,
+                                componentCallback = componentCallback,
+                                appearance = designTokens,
+                                componentOptions = componentOptionsMap
+                        )
+
+                // Initialize component asynchronously
+                scope.launch {
+                        try {
+                                checkoutComponents =
+                                        CheckoutComponentsFactory(config = configuration).create()
+
+                                // Create Card component (SDK handles stored card rendering
+                                // automatically)
+                                cardComponent =
+                                        checkoutComponents.create(
+                                                PaymentMethodName.Card,
+                                                componentOption,
+                                        )
+
+                                if (cardComponent.isAvailable()) {
+                                        withContext(Dispatchers.Main) {
+                                                val composeView = ComposeView(activity)
+                                                composeView.setContent { cardComponent.Render() }
+                                                container.addView(composeView)
+                                                isInitialized = true
+                                                Log.d(
+                                                        "CardPlatformView",
+                                                        "Stored card component initialized successfully"
+                                                )
+                                        }
+                                } else {
+                                        sendError(
+                                                "STORED_CARD_NOT_AVAILABLE",
+                                                "Stored card payment method is not available"
+                                        )
+                                }
+                        } catch (e: CheckoutError) {
+                                sendError("CHECKOUT_ERROR", e.message)
+                        } catch (e: Exception) {
+                                sendError(
+                                        "INIT_ERROR",
+                                        e.message ?: "Failed to initialize stored card component"
+                                )
+                        }
+                }
         }
 
         // ==================== PUBLIC METHODS (Called from MainActivity) ====================

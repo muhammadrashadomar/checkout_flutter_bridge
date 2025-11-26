@@ -67,6 +67,11 @@ class MainActivity : FlutterFragmentActivity() {
                 // This method can be used for additional setup if needed
                 result.success(true)
             }
+            "initStoredCardView" -> {
+                // Stored card view initialization happens in PlatformView
+                // The CardPlatformView detects savedCardConfig and initializes accordingly
+                result.success(true)
+            }
             "validateCard" -> {
                 if (cardPlatformView == null) {
                     result.error("CARD_NOT_READY", "Card view not initialized", null)

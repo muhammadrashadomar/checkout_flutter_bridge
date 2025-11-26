@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/payment_config.dart';
 import '../models/payment_result.dart';
+import '../models/saved_card_config.dart';
 
 /// Unified Payment Bridge - handles all communication with native platforms
 class PaymentBridge {
@@ -144,6 +145,52 @@ class PaymentBridge {
       // Result will come via onCardTokenized callback
     } on PlatformException catch (e) {
       ConsoleLogger.error('Tokenize card failed: ${e.message}');
+      onPaymentError?.call(
+        PaymentErrorResult(
+          errorCode: e.code,
+          errorMessage: e.message ?? 'Tokenization failed',
+        ),
+      );
+    }
+  }
+
+  // ==================== SAVED CARD METHODS ====================
+
+  /// Initialize stored card component with saved card details
+  Future<bool> initStoredCardView(
+    PaymentConfig config,
+    SavedCardConfig savedCardConfig,
+  ) async {
+    try {
+      final params = {
+        ...config.toMap(),
+        'savedCardConfig': savedCardConfig.toMap(),
+      };
+      final result = await _channel.invokeMethod('initStoredCardView', params);
+
+      // Track that we're using saved card payment
+      if (result == true) {
+        _currentPaymentType = 'saved_card';
+        ConsoleLogger.debug('Payment type set to: saved_card');
+      }
+
+      return result == true;
+    } on PlatformException catch (e) {
+      ConsoleLogger.error('Init stored card view failed: ${e.message}');
+      return false;
+    }
+  }
+
+  /// Tokenize saved card (requires CVV input)
+  Future<void> tokenizeSavedCard() async {
+    try {
+      ConsoleLogger.payment('Requesting saved card tokenization...');
+      await _channel.invokeMethod(
+        'tokenizeCard',
+      ); // Same method, different component
+      // Result will come via onCardTokenized callback
+    } on PlatformException catch (e) {
+      ConsoleLogger.error('Tokenize saved card failed: ${e.message}');
       onPaymentError?.call(
         PaymentErrorResult(
           errorCode: e.code,
