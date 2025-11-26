@@ -93,7 +93,7 @@ class GooglePayTokenizer(
         val coordinator =
                 GooglePayFlowCoordinator(
                         context = activity,
-                        handleActivityResult = { resultCode, data ->
+                        handleActivityResult = { resultCode, _ ->
                             Log.d(TAG, "Activity result received with code: $resultCode")
                         }
                 )

@@ -290,10 +290,10 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                 // Extract saved card configuration
                 val savedCardConfig = params["savedCardConfig"] as? Map<*, *>
                 val paymentSourceId = savedCardConfig?.get("paymentSourceId") as? String ?: ""
-                val last4 = savedCardConfig?.get("last4") as? String ?: ""
-                val scheme = savedCardConfig?.get("scheme") as? String ?: ""
-                val expiryMonth = (savedCardConfig?.get("expiryMonth") as? Number)?.toInt() ?: 1
-                val expiryYear = (savedCardConfig?.get("expiryYear") as? Number)?.toInt() ?: 2025
+                // val last4 = savedCardConfig?.get("last4") as? String ?: ""
+                // val scheme = savedCardConfig?.get("scheme") as? String ?: ""
+                // val expiryMonth = (savedCardConfig?.get("expiryMonth") as? Number)?.toInt() ?: 1
+                // val expiryYear = (savedCardConfig?.get("expiryYear") as? Number)?.toInt() ?: 2025
 
                 // Validate required parameters
                 if (sessionId.isEmpty() || sessionSecret.isEmpty() || publicKey.isEmpty()) {
@@ -581,15 +581,25 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
         private fun sendCardTokenized(tokenData: Any?) {
                 runOnMainThread {
                         try {
-                                // Convert TokenDetails to Map using model class
+                                // Convert TokenDetails to Map
                                 val tokenDetailsMap =
                                         when (tokenData) {
                                                 is com.checkout.components.interfaces.model.TokenDetails -> {
-                                                        com.example.flow_flutter_new.models
-                                                                .TokenDetailsModel.fromTokenDetails(
-                                                                        tokenData
-                                                                )
-                                                                .toMap()
+                                                        mapOf(
+                                                                "type" to tokenData.type,
+                                                                "token" to tokenData.token,
+                                                                "expiresOn" to tokenData.expiresOn,
+                                                                "expiryMonth" to
+                                                                        tokenData.expiryMonth,
+                                                                "expiryYear" to
+                                                                        tokenData.expiryYear,
+                                                                "scheme" to tokenData.scheme,
+                                                                "last4" to tokenData.last4,
+                                                                "bin" to tokenData.bin,
+                                                                "cardType" to tokenData.cardType,
+                                                                "cardCategory" to
+                                                                        tokenData.cardCategory
+                                                        )
                                                 }
                                                 else -> {
                                                         Log.w(

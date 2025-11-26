@@ -1,7 +1,9 @@
 package com.checkout.flutter
 
-import android.app.Activity
 import android.util.Log
+import androidx.activity.ComponentActivity
+import com.checkout.flutter.views.CardViewFactory
+import com.checkout.flutter.views.GooglePayViewFactory
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -16,7 +18,7 @@ import io.flutter.plugin.common.MethodChannel.Result
  */
 class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private lateinit var channel: MethodChannel
-    private var activity: Activity? = null
+    private var activity: ComponentActivity? = null
     private var cardPlatformView: CardPlatformView? = null
     private var googlePayPlatformView: GooglePayPlatformView? = null
     private var googlePayTokenizer: GooglePayTokenizer? = null
@@ -36,7 +38,7 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
         // Register platform views
         flutterPluginBinding.platformViewRegistry.registerViewFactory(
                 "flow_card_view",
-                CardViewFactory(messenger) { view ->
+                CardViewFactory(messenger, activity!!) { view ->
                     cardPlatformView = view
                     Log.d(TAG, "Card view instance captured")
                 }
@@ -44,7 +46,7 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
 
         flutterPluginBinding.platformViewRegistry.registerViewFactory(
                 "flow_googlepay_view",
-                GooglePayViewFactory(messenger) { view ->
+                GooglePayViewFactory(messenger, activity!!) { view ->
                     googlePayPlatformView = view
                     Log.d(TAG, "Google Pay view instance captured")
                 }
@@ -216,7 +218,9 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         Log.d(TAG, "Plugin attached to activity")
-        activity = binding.activity
+        activity =
+                binding.activity as? ComponentActivity
+                        ?: throw IllegalStateException("Activity must be a ComponentActivity")
     }
 
     override fun onDetachedFromActivityForConfigChanges() {
@@ -226,7 +230,7 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         Log.d(TAG, "Plugin reattached to activity after config changes")
-        activity = binding.activity
+        activity = binding.activity as? ComponentActivity
     }
 
     override fun onDetachedFromActivity() {
