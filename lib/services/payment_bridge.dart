@@ -43,7 +43,7 @@ class PaymentBridge {
           // Convert from Map<Object?, Object?> to Map<String, dynamic>
           final arguments = Map<String, dynamic>.from(call.arguments as Map);
           final result = CardTokenResult.fromMap(arguments);
-          ConsoleLogger.success('Card tokenized successfully');
+          ConsoleLogger.success('Tokenized successfully');
           onCardTokenized?.call(result);
         } catch (e) {
           ConsoleLogger.error('Error parsing tokenized result: $e');

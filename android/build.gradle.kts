@@ -13,8 +13,8 @@ allprojects {
         google()
         mavenCentral()
         // Ensure the following Maven repositories are included, as they are specifically required for resolving Risk SDK dependencies:
-        maven { url = uri("https://jitpack.io") }
-        maven { url = uri("https://maven.fpregistry.io/releases") }
+        // maven { url = uri("https://jitpack.io") }
+        // maven { url = uri("https://maven.fpregistry.io/releases") }
     }
 }
 

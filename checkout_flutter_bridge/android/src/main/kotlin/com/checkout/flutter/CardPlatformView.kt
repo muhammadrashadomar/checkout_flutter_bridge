@@ -47,29 +47,34 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
         PlatformView {
 
         private val container = FrameLayout(activity)
-        private val channel = MethodChannel(messenger, "checkout_bridge")
-        private val scope = CoroutineScope(Dispatchers.IO)
+        private val channel = MethodChannel(messenger, CHANNEL_NAME)
+        private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         private lateinit var checkoutComponents: CheckoutComponents
         private lateinit var cardComponent: PaymentMethodComponent
 
         @Volatile private var isInitialized = false
 
+        companion object {
+                private const val TAG = "CardPlatformView"
+                private const val CHANNEL_NAME = "checkout_bridge"
+
+                // Error Codes
+                private const val ERR_INIT = "INIT_ERROR"
+                private const val ERR_CARD_NOT_READY = "CARD_NOT_READY"
+                private const val ERR_TOKEN = "TOKEN_ERROR"
+                private const val ERR_SESSION_DATA = "SESSION_DATA_ERROR"
+                private const val ERR_LAUNCH = "LAUNCH_ERROR"
+                private const val ERR_CHECKOUT = "CHECKOUT_ERROR"
+        }
+
         init {
                 // Detect component type from arguments
                 val params = args as? Map<*, *> ?: emptyMap<String, Any>()
-                val hasSavedCardConfig = params.containsKey("savedCardConfig")
-
-                if (hasSavedCardConfig) {
-                        initializeStoredCardComponent(args)
-                } else {
-                        initializeCardComponent(args)
-                }
+                initializeComponent(params)
         }
 
         /* Initialize card component with configuration from Flutter */
-        private fun initializeCardComponent(args: Any?) {
-                val params = args as? Map<*, *> ?: emptyMap<String, Any>()
-
+        private fun initializeComponent(params: Map<*, *>) {
                 // Extract required parameters
                 val sessionId = params["paymentSessionID"] as? String ?: ""
                 val sessionSecret = params["paymentSessionSecret"] as? String ?: ""
@@ -78,8 +83,7 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
 
                 // Validate required parameters
                 if (sessionId.isEmpty() || sessionSecret.isEmpty() || publicKey.isEmpty()) {
-                        // Log.e("CardPlatformView", "Missing required session parameters")
-                        sendError("INIT_ERROR", "Missing required payment session parameters")
+                        sendError(ERR_INIT, "Missing required payment session parameters")
                         return
                 }
 
@@ -94,72 +98,38 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                 val appearance = params["appearance"] as? Map<*, *>
                 val designTokens = buildDesignTokens(appearance)
 
-                // Parse card configuration
+                // Determine if this is a stored card or new card
+                val hasSavedCardConfig = params.containsKey("savedCardConfig")
                 val cardConfig = params["cardConfig"] as? Map<*, *>
                 val showCardholderName = cardConfig?.get("showCardholderName") as? Boolean ?: false
 
                 // Build component callback
-                val componentCallback =
-                        ComponentCallback(
-                                onReady = { component ->
-                                        Log.d(
-                                                "CardPlatformView",
-                                                "Component ready: ${component.name}"
-                                        )
-                                },
-                                handleSubmit = { sessionData ->
-                                        Log.d(
-                                                "CardPlatformView",
-                                                "handleSubmit called with sessionData: $sessionData"
-                                        )
+                val componentCallback = createComponentCallback()
 
-                                        // Send session data to Flutter for backend submission
-                                        sendSessionData(sessionData)
-
-                                        // Return Failure to prevent SDK from completing payment
-                                        // This allows us to get session data without
-                                        // auto-completing payment
-                                        ApiCallResult.Failure
-                                },
-                                onSubmit = { component ->
-                                        Log.d(
-                                                "CardPlatformView",
-                                                "Component submitted: ${component.name}"
-                                        )
-                                },
-                                onSuccess = { _, paymentID ->
-                                        // Log.d("CardPlatformView", "Payment success: $paymentID")
-                                        sendPaymentSuccess(paymentID)
-                                },
-                                onTokenized = { result ->
-                                        // Log.d("CardPlatformView", "Card tokenized:
-                                        // ${result.data}")
-                                        sendCardTokenized(result.data)
-                                        CallbackResult.Accepted
-                                },
-                                onError = { _, checkoutError ->
-                                        Log.e("CardPlatformView", "Error: ${checkoutError.message}")
-                                        sendError(
-                                                checkoutError.code.toString(),
-                                                checkoutError.message
-                                        )
-                                },
-                        )
-
-                // Build component options - HIDE native pay button
+                // Build component options
                 val componentOption =
-                        ComponentOption(
-                                showPayButton =
-                                        false, // ✅ Hide native button - controlled by Flutter
-                                paymentButtonAction = PaymentButtonAction.TOKENIZE,
-                                cardConfiguration =
-                                        CardConfiguration(
-                                                displayCardholderName =
-                                                        if (showCardholderName)
-                                                                CardholderNamePosition.TOP
-                                                        else CardholderNamePosition.HIDDEN
-                                        )
-                        )
+                        if (hasSavedCardConfig) {
+                                // Stored card options
+                                ComponentOption(
+                                        showPayButton = false,
+                                        paymentButtonAction = PaymentButtonAction.TOKENIZE,
+                                )
+                        } else {
+                                // New card options
+                                ComponentOption(
+                                        showPayButton =
+                                                false, // ✅ Hide native button - controlled by
+                                        // Flutter
+                                        paymentButtonAction = PaymentButtonAction.TOKENIZE,
+                                        cardConfiguration =
+                                                CardConfiguration(
+                                                        displayCardholderName =
+                                                                if (showCardholderName)
+                                                                        CardholderNamePosition.TOP
+                                                                else CardholderNamePosition.HIDDEN
+                                                )
+                                )
+                        }
 
                 val componentOptionsMap = mapOf(PaymentMethodName.Card to componentOption)
 
@@ -197,28 +167,54 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                                 container.addView(composeView)
                                                 isInitialized = true
                                                 Log.d(
-                                                        "CardPlatformView",
+                                                        TAG,
                                                         "Card component initialized successfully"
                                                 )
                                         }
                                 } else {
-                                        // Log.e("CardPlatformView", "Card component not available")
                                         sendError(
                                                 "CARD_NOT_AVAILABLE",
                                                 "Card payment method is not available"
                                         )
                                 }
                         } catch (e: CheckoutError) {
-                                // Log.e("CardPlatformView", "Checkout error: ${e.message}", e)
-                                sendError("CHECKOUT_ERROR", e.message)
+                                sendError(ERR_CHECKOUT, e.message)
                         } catch (e: Exception) {
-                                // Log.e("CardPlatformView", "Unexpected error: ${e.message}", e)
                                 sendError(
-                                        "INIT_ERROR",
+                                        ERR_INIT,
                                         e.message ?: "Failed to initialize card component"
                                 )
                         }
                 }
+        }
+
+        private fun createComponentCallback(): ComponentCallback {
+                return ComponentCallback(
+                        onReady = { component -> Log.d(TAG, "Component ready: ${component.name}") },
+                        handleSubmit = { sessionData ->
+                                Log.d(TAG, "handleSubmit called with sessionData: $sessionData")
+
+                                // Send session data to Flutter for backend submission
+                                sendSessionData(sessionData)
+
+                                // Return Failure to prevent SDK from completing payment
+                                // This allows us to get session data without
+                                // auto-completing payment
+                                ApiCallResult.Failure
+                        },
+                        onSubmit = { component ->
+                                Log.d(TAG, "Component submitted: ${component.name}")
+                        },
+                        onSuccess = { _, paymentID -> sendPaymentSuccess(paymentID) },
+                        onTokenized = { result ->
+                                sendCardTokenized(result.data)
+                                CallbackResult.Accepted
+                        },
+                        onError = { _, checkoutError ->
+                                Log.e(TAG, "Error: ${checkoutError.message}")
+                                sendError(checkoutError.code.toString(), checkoutError.message)
+                        },
+                )
         }
 
         /* Build design tokens from appearance configuration */
@@ -277,160 +273,6 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                 )
         }
 
-        /* Initialize stored card component with saved card configuration */
-        private fun initializeStoredCardComponent(args: Any?) {
-                val params = args as? Map<*, *> ?: emptyMap<String, Any>()
-
-                // Extract required parameters
-                val sessionId = params["paymentSessionID"] as? String ?: ""
-                val sessionSecret = params["paymentSessionSecret"] as? String ?: ""
-                val publicKey = params["publicKey"] as? String ?: ""
-                val environmentStr = params["environment"] as? String ?: "sandbox"
-
-                // Extract saved card configuration
-                val savedCardConfig = params["savedCardConfig"] as? Map<*, *>
-                val paymentSourceId = savedCardConfig?.get("paymentSourceId") as? String ?: ""
-                // val last4 = savedCardConfig?.get("last4") as? String ?: ""
-                // val scheme = savedCardConfig?.get("scheme") as? String ?: ""
-                // val expiryMonth = (savedCardConfig?.get("expiryMonth") as? Number)?.toInt() ?: 1
-                // val expiryYear = (savedCardConfig?.get("expiryYear") as? Number)?.toInt() ?: 2025
-
-                // Validate required parameters
-                if (sessionId.isEmpty() || sessionSecret.isEmpty() || publicKey.isEmpty()) {
-                        sendError("INIT_ERROR", "Missing required payment session parameters")
-                        return
-                }
-
-                if (paymentSourceId.isEmpty()) {
-                        sendError(
-                                "INIT_ERROR",
-                                "Missing payment source ID - required for saved card CVV-only input"
-                        )
-                        return
-                }
-
-                Log.d(
-                        "CardPlatformView",
-                        "Initializing stored card with source ID: $paymentSourceId"
-                )
-
-                // Parse environment
-                val environment =
-                        when (environmentStr.lowercase()) {
-                                "production" -> Environment.PRODUCTION
-                                else -> Environment.SANDBOX
-                        }
-
-                // Parse appearance configuration
-                val appearance = params["appearance"] as? Map<*, *>
-                val designTokens = buildDesignTokens(appearance)
-
-                // Build component callback (same as card component)
-                val componentCallback =
-                        ComponentCallback(
-                                onReady = { component ->
-                                        Log.d(
-                                                "CardPlatformView",
-                                                "Stored card component ready: ${component.name}"
-                                        )
-                                },
-                                handleSubmit = { sessionData ->
-                                        Log.d(
-                                                "CardPlatformView",
-                                                "handleSubmit called with sessionData: $sessionData"
-                                        )
-                                        sendSessionData(sessionData)
-                                        ApiCallResult.Failure
-                                },
-                                onSubmit = { component ->
-                                        Log.d(
-                                                "CardPlatformView",
-                                                "Component submitted: ${component.name}"
-                                        )
-                                },
-                                onSuccess = { _, paymentID -> sendPaymentSuccess(paymentID) },
-                                onTokenized = { result ->
-                                        sendCardTokenized(result.data)
-                                        CallbackResult.Accepted
-                                },
-                                onError = { _, checkoutError ->
-                                        Log.e("CardPlatformView", "Error: ${checkoutError.message}")
-                                        sendError(
-                                                checkoutError.code.toString(),
-                                                checkoutError.message
-                                        )
-                                },
-                        )
-
-                // Build component options for stored card (uses Card component)
-                val componentOption =
-                        ComponentOption(
-                                showPayButton = false,
-                                paymentButtonAction = PaymentButtonAction.TOKENIZE,
-                        )
-
-                // NOTE: Checkout SDK doesn't have explicit StoredCard type
-                // We use Card component which will render CVV-only input for stored cards
-                val componentOptionsMap = mapOf(PaymentMethodName.Card to componentOption)
-
-                // Build configuration
-                val configuration =
-                        CheckoutComponentConfiguration(
-                                context = activity,
-                                paymentSession =
-                                        PaymentSessionResponse(
-                                                id = sessionId,
-                                                secret = sessionSecret
-                                        ),
-                                publicKey = publicKey,
-                                environment = environment,
-                                componentCallback = componentCallback,
-                                appearance = designTokens,
-                                componentOptions = componentOptionsMap
-                        )
-
-                // Initialize component asynchronously
-                scope.launch {
-                        try {
-                                checkoutComponents =
-                                        CheckoutComponentsFactory(config = configuration).create()
-
-                                // Create Card component (SDK handles stored card rendering
-                                // automatically)
-                                cardComponent =
-                                        checkoutComponents.create(
-                                                PaymentMethodName.Card,
-                                                componentOption,
-                                        )
-
-                                if (cardComponent.isAvailable()) {
-                                        withContext(Dispatchers.Main) {
-                                                val composeView = ComposeView(activity)
-                                                composeView.setContent { cardComponent.Render() }
-                                                container.addView(composeView)
-                                                isInitialized = true
-                                                Log.d(
-                                                        "CardPlatformView",
-                                                        "Stored card component initialized successfully"
-                                                )
-                                        }
-                                } else {
-                                        sendError(
-                                                "STORED_CARD_NOT_AVAILABLE",
-                                                "Stored card payment method is not available"
-                                        )
-                                }
-                        } catch (e: CheckoutError) {
-                                sendError("CHECKOUT_ERROR", e.message)
-                        } catch (e: Exception) {
-                                sendError(
-                                        "INIT_ERROR",
-                                        e.message ?: "Failed to initialize stored card component"
-                                )
-                        }
-                }
-        }
-
         // ==================== PUBLIC METHODS (Called from MainActivity) ====================
 
         /**
@@ -439,7 +281,7 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
          */
         fun validateCard(): Boolean {
                 if (!isInitialized || !::cardComponent.isInitialized) {
-                        Log.w("CardPlatformView", "Card component not initialized for validation")
+                        Log.w(TAG, "Card component not initialized for validation")
                         return false
                 }
 
@@ -454,13 +296,13 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
          */
         fun tokenizeCard(result: MethodChannel.Result) {
                 if (!isInitialized || !::cardComponent.isInitialized) {
-                        result.error("CARD_NOT_READY", "Card component not initialized", null)
+                        result.error(ERR_CARD_NOT_READY, "Card component not initialized", null)
                         return
                 }
 
                 scope.launch {
                         try {
-                                Log.d("CardPlatformView", "Starting tokenization...")
+                                Log.d(TAG, "Starting tokenization...")
 
                                 // Tokenize on background thread
                                 withContext(Dispatchers.Default) { cardComponent.tokenize() }
@@ -471,10 +313,10 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                         result.success(mapOf("status" to "processing"))
                                 }
                         } catch (e: Exception) {
-                                Log.e("CardPlatformView", "Tokenization error: ${e.message}", e)
+                                Log.e(TAG, "Tokenization error: ${e.message}", e)
                                 withContext(Dispatchers.Main) {
                                         result.error(
-                                                "TOKEN_ERROR",
+                                                ERR_TOKEN,
                                                 e.message ?: "Tokenization failed",
                                                 null
                                         )
@@ -484,53 +326,31 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
         }
 
         fun getSessionData(result: MethodChannel.Result) {
-                Log.d("CardPlatformView", "getSessionData called - checking initialization...")
-                Log.d("CardPlatformView", "isInitialized: $isInitialized")
-                Log.d(
-                        "CardPlatformView",
-                        "cardComponent initialized: ${::cardComponent.isInitialized}"
-                )
-
                 if (!isInitialized || !::cardComponent.isInitialized) {
-                        val errorMsg =
-                                "Card component not initialized - isInitialized: $isInitialized, cardComponent: ${::cardComponent.isInitialized}"
-                        Log.e("CardPlatformView", errorMsg)
-                        result.error("CARD_NOT_READY", errorMsg, null)
+                        val errorMsg = "Card component not initialized"
+                        Log.e(TAG, errorMsg)
+                        result.error(ERR_CARD_NOT_READY, errorMsg, null)
                         return
                 }
 
                 try {
-                        Log.d("CardPlatformView", "About to launch coroutine on Main dispatcher...")
-
                         // Use Main dispatcher and SupervisorJob to ensure coroutine executes
                         CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
-                                Log.d(
-                                        "CardPlatformView",
-                                        "✅ Coroutine started on thread: ${Thread.currentThread().name}"
-                                )
-
                                 try {
-                                        Log.d(
-                                                "CardPlatformView",
-                                                "Starting session data submission..."
-                                        )
+                                        Log.d(TAG, "Starting session data submission...")
 
                                         // Submit session data on background thread
                                         withContext(Dispatchers.Default) {
-                                                Log.d(
-                                                        "CardPlatformView",
-                                                        "Calling cardComponent.submit() on thread: ${Thread.currentThread().name}..."
-                                                )
                                                 try {
                                                         cardComponent.submit()
                                                         Log.d(
-                                                                "CardPlatformView",
+                                                                TAG,
                                                                 "✅ cardComponent.submit() completed successfully"
                                                         )
                                                         true
                                                 } catch (e: Exception) {
                                                         Log.e(
-                                                                "CardPlatformView",
+                                                                TAG,
                                                                 "❌ cardComponent.submit() threw exception: ${e.message}",
                                                                 e
                                                         )
@@ -541,21 +361,17 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                         // Result will be sent via handleSubmit callback
                                         // Send success to acknowledge the call
                                         withContext(Dispatchers.Main) {
-                                                Log.d(
-                                                        "CardPlatformView",
-                                                        "Sending 'processing' status to Flutter"
-                                                )
                                                 result.success(mapOf("status" to "processing"))
                                         }
                                 } catch (e: Exception) {
                                         Log.e(
-                                                "CardPlatformView",
+                                                TAG,
                                                 "❌ Session data submission error: ${e.message}",
                                                 e
                                         )
                                         withContext(Dispatchers.Main) {
                                                 result.error(
-                                                        "SESSION_DATA_ERROR",
+                                                        ERR_SESSION_DATA,
                                                         e.message
                                                                 ?: "Session data submission failed",
                                                         null
@@ -563,15 +379,9 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                         }
                                 }
                         }
-
-                        Log.d("CardPlatformView", "Coroutine launched successfully")
                 } catch (e: Exception) {
-                        Log.e("CardPlatformView", "Failed to launch coroutine: ${e.message}", e)
-                        result.error(
-                                "LAUNCH_ERROR",
-                                e.message ?: "Failed to launch coroutine",
-                                null
-                        )
+                        Log.e(TAG, "Failed to launch coroutine: ${e.message}", e)
+                        result.error(ERR_LAUNCH, e.message ?: "Failed to launch coroutine", null)
                 }
         }
 
@@ -603,7 +413,7 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                                 }
                                                 else -> {
                                                         Log.w(
-                                                                "CardPlatformView",
+                                                                TAG,
                                                                 "Unknown token data type: ${tokenData?.javaClass}"
                                                         )
                                                         mapOf("raw" to tokenData.toString())
@@ -612,13 +422,9 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
 
                                 val data = mapOf("tokenDetails" to tokenDetailsMap)
                                 channel.invokeMethod("cardTokenized", data)
-                                Log.d("CardPlatformView", "Card tokenized event sent to Flutter")
+                                Log.d(TAG, "Card tokenized event sent to Flutter")
                         } catch (e: Exception) {
-                                Log.e(
-                                        "CardPlatformView",
-                                        "Failed to send tokenized event: ${e.message}",
-                                        e
-                                )
+                                Log.e(TAG, "Failed to send tokenized event: ${e.message}", e)
                         }
                 }
         }
@@ -630,16 +436,12 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                 val data = mapOf("sessionData" to sessionData)
 
                                 channel.invokeMethod("sessionDataReady", data)
-                                Log.d("CardPlatformView", "Session data sent ")
+                                Log.d(TAG, "Session data sent ")
                         } catch (e: Exception) {
-                                Log.e(
-                                        "CardPlatformView",
-                                        "Failed to send session data: ${e.message}",
-                                        e
-                                )
+                                Log.e(TAG, "Failed to send session data: ${e.message}", e)
                                 // Send error to Flutter
                                 sendError(
-                                        "SESSION_DATA_ERROR",
+                                        ERR_SESSION_DATA,
                                         e.message ?: "Failed to send session data"
                                 )
                         }
@@ -651,13 +453,9 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                 runOnMainThread {
                         try {
                                 channel.invokeMethod("paymentSuccess", paymentId)
-                                Log.d("CardPlatformView", "Payment success event sent to Flutter")
+                                Log.d(TAG, "Payment success event sent to Flutter")
                         } catch (e: Exception) {
-                                Log.e(
-                                        "CardPlatformView",
-                                        "Failed to send success event: ${e.message}",
-                                        e
-                                )
+                                Log.e(TAG, "Failed to send success event: ${e.message}", e)
                         }
                 }
         }
@@ -668,16 +466,9 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                         try {
                                 val error = mapOf("code" to code, "message" to message)
                                 channel.invokeMethod("paymentError", error)
-                                Log.d(
-                                        "CardPlatformView",
-                                        "Error event sent to Flutter: $code - $message"
-                                )
+                                Log.d(TAG, "Error event sent to Flutter: $code - $message")
                         } catch (e: Exception) {
-                                Log.e(
-                                        "CardPlatformView",
-                                        "Failed to send error event: ${e.message}",
-                                        e
-                                )
+                                Log.e(TAG, "Failed to send error event: ${e.message}", e)
                         }
                 }
         }
@@ -697,6 +488,6 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
 
         override fun dispose() {
                 scope.cancel()
-                Log.d("CardPlatformView", "Card component disposed")
+                Log.d(TAG, "Card component disposed")
         }
 }

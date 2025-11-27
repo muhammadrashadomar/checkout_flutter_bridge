@@ -262,6 +262,9 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
         try {
             Log.d(TAG, "Cleaning up resources")
             googlePayTokenizer?.dispose()
+            cardPlatformView?.dispose()
+            googlePayPlatformView?.dispose()
+
             cardPlatformView = null
             googlePayPlatformView = null
             googlePayTokenizer = null

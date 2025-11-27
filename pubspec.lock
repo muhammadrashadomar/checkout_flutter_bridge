@@ -29,10 +29,8 @@ packages:
     dependency: "direct main"
     description:
       path: checkout_flutter_bridge
-      ref: main
-      resolved-ref: a862a4e7c5501feed08bbf76f469659a451ca6c3
-      url: "https://github.com/muhammadrashadomar/checkout_flutter_bridge.git"
-    source: git
+      relative: true
+    source: path
     version: "0.1.0"
   clock:
     dependency: transitive

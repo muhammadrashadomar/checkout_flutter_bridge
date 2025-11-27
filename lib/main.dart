@@ -19,12 +19,14 @@ import 'package:pay/pay.dart';
 const bool _enableDebugLogging = kDebugMode;
 
 // Google Pay Configuration
-const String paymentSessionId = 'ps_361aa24LChrMSCtQgYZY6eaYxGM';
-const String paymentSessionSecret = 'pss_d498e733-fba6-4169-a26a-f9be5c433622';
+const String paymentSessionId = 'ps_363PQOzhsaqQcSKu3RfiUeer2ok';
+const String paymentSessionSecret = 'pss_50a256d5-c4bf-475a-8261-73b1ad7cb905';
 const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 const String envMode = 'TEST';
 const String currency = 'SAR';
 const double totalPrice = 10.00;
+
+bool _isCardSelected = false;
 
 // Payment configuration
 final _paymentConfig = PaymentConfig(
@@ -182,9 +184,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
     ConsoleLogger.success('Session Data: $result');
   }
 
-  Future<void> _getSessionData(String method) async {
+  Future<void> _getSessionData(CurrentPaymentType paymentType) async {
     setState(() => _isProcessing = true);
-    await _paymentBridge.submit(method);
+    await _paymentBridge.submit(paymentType);
     setState(() => _isProcessing = false);
   }
 
@@ -285,7 +287,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
             const SizedBox(height: 50),
             //! Submit Button ---------------------------------------------
             ElevatedButton(
-              onPressed: () => _getSessionData('card'),
+              onPressed:
+                  () => _getSessionData(
+                    _isCardSelected
+                        ? CurrentPaymentType.card
+                        : CurrentPaymentType.googlepay,
+                  ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
@@ -478,6 +485,7 @@ class _GooglePayButtonState extends State<_GooglePayButton> {
 
       debugPrint('[GooglePayButton] Payment data sent successfully');
       widget.onProcessing(false);
+      _isCardSelected = false;
       // Note: Actual result will come via callback
     } on TimeoutException catch (e) {
       debugPrint('[GooglePayButton] Timeout error: $e');
@@ -603,7 +611,7 @@ class _CardBottomSheetState extends State<_CardBottomSheet> {
           ),
         );
       }
-
+      _isCardSelected = true;
       return;
     }
 

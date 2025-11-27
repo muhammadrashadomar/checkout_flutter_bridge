@@ -7,9 +7,11 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import com.checkout.components.core.CheckoutComponentsFactory
 import com.checkout.components.interfaces.Environment
+import com.checkout.components.interfaces.api.PaymentMethodComponent
 import com.checkout.components.interfaces.component.CheckoutComponentConfiguration
 import com.checkout.components.interfaces.component.ComponentCallback
 import com.checkout.components.interfaces.error.CheckoutError
+import com.checkout.components.interfaces.model.ApiCallResult
 import com.checkout.components.interfaces.model.PaymentMethodName
 import com.checkout.components.interfaces.model.PaymentSessionResponse
 import com.checkout.components.wallet.wrapper.GooglePayFlowCoordinator
@@ -20,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
 /**
@@ -44,11 +47,21 @@ class GooglePayTokenizer(
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private var googlePayFlowCoordinator: GooglePayFlowCoordinator? = null
+    private lateinit var googlePayComponent: PaymentMethodComponent
+
     private val isInitialized = AtomicBoolean(false)
     private val isInitializing = AtomicBoolean(false)
 
     override val lifecycle: Lifecycle
         get() = lifecycleRegistry
+
+    companion object {
+        private const val TAG = "GooglePayTokenizer"
+
+        // Timeout constants (in milliseconds)
+        private const val INITIALIZATION_TIMEOUT_MS = 30000L // 30 seconds
+        private const val TOKENIZATION_TIMEOUT_MS = 15000L // 15 seconds
+    }
 
     /**
      * Initialize the Checkout SDK for Google Pay tokenization
@@ -104,6 +117,13 @@ class GooglePayTokenizer(
                         onReady = { component ->
                             Log.d(TAG, "Google Pay component ready: ${component.name}")
                         },
+                        handleSubmit = { sessionData ->
+                            Log.d(TAG, "handleSubmit called with sessionData: $sessionData")
+                            // Send session data to Flutter
+                            sendSessionData(sessionData)
+                            // Return Failure to prevent SDK from completing payment automatically
+                            ApiCallResult.Failure
+                        },
                         onSubmit = { component ->
                             Log.d(TAG, "Google Pay component submitted: ${component.name}")
                         },
@@ -140,7 +160,7 @@ class GooglePayTokenizer(
                 withTimeout(INITIALIZATION_TIMEOUT_MS) {
                     val checkoutComponents =
                             CheckoutComponentsFactory(config = configuration).create()
-                    val googlePayComponent = checkoutComponents.create(PaymentMethodName.GooglePay)
+                    googlePayComponent = checkoutComponents.create(PaymentMethodName.GooglePay)
 
                     if (googlePayComponent.isAvailable()) {
                         googlePayFlowCoordinator = coordinator
@@ -240,7 +260,7 @@ class GooglePayTokenizer(
      */
     fun getGooglePaySessionData(result: MethodChannel.Result) {
         // Validate state
-        if (!isInitialized.get()) {
+        if (!isInitialized.get() || !::googlePayComponent.isInitialized) {
             Log.e(TAG, "Get session data failed: Google Pay tokenizer not initialized")
             result.error(ErrorCode.INVALID_STATE.name, "Google Pay tokenizer not initialized", null)
             return
@@ -251,23 +271,12 @@ class GooglePayTokenizer(
         coroutineScope.launch {
             try {
                 withTimeout(TOKENIZATION_TIMEOUT_MS) {
-                    // For Google Pay, the session data would typically be the payment configuration
-                    // or the ready-to-submit payment request structure
-                    // This can be used to prepare the payment on the backend before execution
+                    // Call submit() on the component to trigger handleSubmit
+                    withContext(Dispatchers.Default) { googlePayComponent.submit() }
 
-                    val sessionData =
-                            mapOf(
-                                    "type" to "googlepay",
-                                    "paymentMethod" to "GOOGLEPAY",
-                                    "status" to "ready"
-                            )
+                    Log.i(TAG, "Google Pay submit called successfully")
 
-                    Log.i(TAG, "Google Pay session data retrieved successfully")
-
-                    // Send session data back to Flutter via callback
-                    sendSessionData(sessionData)
-
-                    // Notify method call success
+                    // Notify method call success (actual data comes via callback)
                     result.success(true)
                 }
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
@@ -429,14 +438,13 @@ class GooglePayTokenizer(
     }
 
     /** Send session data event to Flutter */
-    private fun sendSessionData(sessionData: Map<String, String>) {
+    private fun sendSessionData(sessionData: String) {
         try {
             Log.d(TAG, "Sending session data to Flutter: $sessionData")
 
             // Send the map directly wrapped in sessionData key
             val data = mapOf("sessionData" to sessionData)
 
-            Log.d(TAG, "Wrapped data: $data")
             channel.invokeMethod("sessionDataReady", data)
             Log.d(TAG, "Session data sent to Flutter successfully")
         } catch (e: Exception) {
@@ -471,12 +479,4 @@ class GooglePayTokenizer(
     /** Custom exception for Google Pay specific errors */
     private class GooglePayException(val errorCode: ErrorCode, message: String) :
             Exception(message)
-
-    companion object {
-        private const val TAG = "GooglePayTokenizer"
-
-        // Timeout constants (in milliseconds)
-        private const val INITIALIZATION_TIMEOUT_MS = 30000L // 30 seconds
-        private const val TOKENIZATION_TIMEOUT_MS = 15000L // 15 seconds
-    }
 }
