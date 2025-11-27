@@ -38,6 +38,13 @@ dependencies:
   # Google Pay integration
   pay: ^3.3.0
 
+  # Checkout Flutter Bridge
+  checkout_flutter_bridge:
+    git:
+      url: https://github.com/muhammadrashadomar/checkout_flutter_bridge.git
+      path: checkout_flutter_bridge
+      ref: main
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

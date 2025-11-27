@@ -1,24 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flow_flutter_new/models/saved_card_config.dart';
-import 'package:flow_flutter_new/utils/console_logger.dart';
+// import 'package:flow_flutter_new/models/saved_card_config.dart';
+// import 'package:flow_flutter_new/utils/console_logger.dart';
+import 'package:checkout_flutter_bridge/checkout_flutter_bridge.dart';
+import 'package:flow_flutter_new/models/google_pay_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pay/pay.dart';
 
-import 'models/google_pay_config.dart';
-import 'models/payment_config.dart';
-import 'models/payment_result.dart';
-import 'services/payment_bridge.dart';
+// import 'models/google_pay_config.dart';
+// import 'models/payment_config.dart';
+// import 'models/payment_result.dart';
+// import 'services/payment_bridge.dart';
 
 // Debug flag - set to false in production
 const bool _enableDebugLogging = kDebugMode;
 
 // Google Pay Configuration
-const String paymentSessionId = 'ps_35yfyWifVDMIRmbpdVrsBy5Gwb6';
-const String paymentSessionSecret = 'pss_5345e898-e2d5-48ed-84fa-ce2d8b12fbf0';
+const String paymentSessionId = 'ps_361aa24LChrMSCtQgYZY6eaYxGM';
+const String paymentSessionSecret = 'pss_d498e733-fba6-4169-a26a-f9be5c433622';
 const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 const String envMode = 'TEST';
 const String currency = 'SAR';
