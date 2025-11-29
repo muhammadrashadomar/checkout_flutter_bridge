@@ -192,7 +192,7 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                 return ComponentCallback(
                         onReady = { component -> Log.d(TAG, "Component ready: ${component.name}") },
                         handleSubmit = { sessionData ->
-                                Log.d(TAG, "handleSubmit called with sessionData: $sessionData")
+                                Log.d(TAG, "[Flow-Card]: sessionData fetched successfully")
 
                                 // Send session data to Flutter for backend submission
                                 sendSessionData(sessionData)
@@ -202,16 +202,15 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                 // auto-completing payment
                                 ApiCallResult.Failure
                         },
-                        onSubmit = { component ->
-                                Log.d(TAG, "Component submitted: ${component.name}")
-                        },
+                        onSubmit = { component -> Log.d(TAG, "[Flow-Card]: onSubmit called") },
                         onSuccess = { _, paymentID -> sendPaymentSuccess(paymentID) },
                         onTokenized = { result ->
+                                Log.d(TAG, "[Flow-Card]: tokenized successfully")
                                 sendCardTokenized(result.data)
                                 CallbackResult.Accepted
                         },
                         onError = { _, checkoutError ->
-                                Log.e(TAG, "Error: ${checkoutError.message}")
+                                Log.e(TAG, "[Flow-Card] Error: ${checkoutError.message}")
                                 sendError(checkoutError.code.toString(), checkoutError.message)
                         },
                 )

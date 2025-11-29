@@ -22,7 +22,6 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
     private var activity: ComponentActivity? = null
     private var cardPlatformView: CardPlatformView? = null
     private var googlePayPlatformView: GooglePayPlatformView? = null
-    private var googlePayTokenizer: GooglePayTokenizer? = null
 
     companion object {
         private const val CHANNEL = "checkout_bridge"
@@ -87,7 +86,7 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
                     result.error("CARD_NOT_READY", "Card view not initialized", null)
                     return
                 }
-                val isValid = cardPlatformView?.validateCard() ?: false
+                val isValid = cardPlatformView!!.validateCard()
                 result.success(isValid)
             }
             "tokenizeCard" -> {
@@ -107,68 +106,18 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
 
             // ==================== GOOGLE PAY METHODS ====================
             "initGooglePay" -> {
-                try {
-                    Log.d(TAG, "Initializing Google Pay")
-
-                    if (googlePayTokenizer == null) {
-                        // Initialize on first call
-                        if (activity != null) {
-                            googlePayTokenizer = GooglePayTokenizer(activity!!, channel)
-                        } else {
-                            result.error("NO_ACTIVITY", "Activity not available", null)
-                            return
-                        }
-                    }
-
-                    @Suppress("UNCHECKED_CAST") val args = call.arguments as? Map<String, Any>
-
-                    if (args == null) {
-                        result.error("INVALID_ARGS", "Configuration parameters are required", null)
-                        return
-                    }
-
-                    val sessionId = args["paymentSessionID"] as? String
-                    val sessionSecret = args["paymentSessionSecret"] as? String
-                    val publicKey = args["publicKey"] as? String
-                    val environment = args["environment"] as? String ?: "sandbox"
-
-                    // Validate required parameters
-                    when {
-                        sessionId.isNullOrBlank() -> {
-                            result.error("INVALID_ARGS", "Session ID is required", null)
-                            return
-                        }
-                        sessionSecret.isNullOrBlank() -> {
-                            result.error("INVALID_ARGS", "Session secret is required", null)
-                            return
-                        }
-                        publicKey.isNullOrBlank() -> {
-                            result.error("INVALID_ARGS", "Public key is required", null)
-                            return
-                        }
-                    }
-
-                    googlePayTokenizer?.initialize(
-                            sessionId!!,
-                            sessionSecret!!,
-                            publicKey!!,
-                            environment
-                    )
-                    result.success(true)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error in initGooglePay", e)
-                    result.error(
-                            "INIT_ERROR",
-                            "Failed to initialize Google Pay: ${e.message}",
-                            null
-                    )
-                }
+                // Google Pay initialization happens in PlatformView
+                result.success(true)
             }
             "checkGooglePayAvailability" -> {
-
+                if (googlePayPlatformView == null) {
+                    result.success(false)
+                    return
+                }
                 try {
-                    // Native check can be implemented here if needed
-                    result.success(true)
+                    googlePayPlatformView!!.checkAvailability { isAvailable ->
+                        result.success(isAvailable)
+                    }
                 } catch (e: Exception) {
                     result.error(
                             "AVAILABILITY_CHECK_FAILED",
@@ -177,48 +126,16 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
                     )
                 }
             }
-            "tokenizeGooglePayData" -> {
-                try {
-                    if (googlePayTokenizer == null) {
-                        result.error(
-                                "GOOGLEPAY_NOT_READY",
-                                "Google Pay tokenizer not initialized",
-                                null
-                        )
-                        return
-                    }
-
-                    @Suppress("UNCHECKED_CAST") val args = call.arguments as? Map<String, Any>
-                    val paymentData = args?.get("paymentData") as? String
-
-                    if (paymentData.isNullOrBlank()) {
-                        result.error("INVALID_ARGS", "Payment data cannot be empty", null)
-                        return
-                    }
-
-                    googlePayTokenizer?.tokenizePaymentData(paymentData, result)
-                } catch (e: Exception) {
-                    result.error("TOKENIZATION_ERROR", "Failed to tokenize: ${e.message}", null)
-                }
-            }
             "getGooglePaySessionData" -> {
-                try {
-                    if (googlePayTokenizer == null) {
-                        result.error(
-                                "GOOGLEPAY_NOT_READY",
-                                "Google Pay tokenizer not initialized",
-                                null
-                        )
-                        return
-                    }
-                    googlePayTokenizer?.getGooglePaySessionData(result)
-                } catch (e: Exception) {
-                    result.error(
-                            "SESSION_DATA_ERROR",
-                            "Failed to get session data: ${e.message}",
-                            null
-                    )
+                // Session data is automatically sent via handleSubmit callback
+                result.success(true)
+            }
+            "tokenizeGooglePay" -> {
+                if (googlePayPlatformView == null) {
+                    result.error("GOOGLEPAY_NOT_READY", "Google Pay view not initialized", null)
+                    return
                 }
+                googlePayPlatformView?.tokenizeGooglePay(result)
             }
             else -> {
                 result.notImplemented()
@@ -261,13 +178,11 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
     private fun cleanup() {
         try {
             Log.d(TAG, "Cleaning up resources")
-            googlePayTokenizer?.dispose()
             cardPlatformView?.dispose()
             googlePayPlatformView?.dispose()
 
             cardPlatformView = null
             googlePayPlatformView = null
-            googlePayTokenizer = null
             flutterPluginBinding = null
         } catch (e: Exception) {
             Log.e(TAG, "Error during cleanup", e)

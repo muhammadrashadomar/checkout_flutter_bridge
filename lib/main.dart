@@ -1,26 +1,15 @@
 import 'dart:async';
-import 'dart:convert';
 
-// import 'package:flow_flutter_new/models/saved_card_config.dart';
-// import 'package:flow_flutter_new/utils/console_logger.dart';
 import 'package:checkout_flutter_bridge/checkout_flutter_bridge.dart';
-import 'package:flow_flutter_new/models/google_pay_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:pay/pay.dart';
-
-// import 'models/google_pay_config.dart';
-// import 'models/payment_config.dart';
-// import 'models/payment_result.dart';
-// import 'services/payment_bridge.dart';
 
 // Debug flag - set to false in production
 const bool _enableDebugLogging = kDebugMode;
 
 // Google Pay Configuration
-const String paymentSessionId = 'ps_363PQOzhsaqQcSKu3RfiUeer2ok';
-const String paymentSessionSecret = 'pss_50a256d5-c4bf-475a-8261-73b1ad7cb905';
+const String paymentSessionId = 'ps_369vdjei06LihcT95ur7gAL6NoJ';
+const String paymentSessionSecret = 'pss_72eb5c36-f46e-4e51-a3dd-4b8dead20beb';
 const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 const String envMode = 'TEST';
 const String currency = 'SAR';
@@ -190,49 +179,52 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() => _isProcessing = false);
   }
 
-  void _showCardSheet() async {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder:
-          (context) => _CardBottomSheet(
-            paymentConfig: _paymentConfig,
-            onProcessing: (processing) {
-              setState(() => _isProcessing = processing);
-            },
-            onInitialized: () {},
-          ),
-    );
-  }
+  // Future<void> _tokenizeCard() async {
+  //   // Validate card first
+  //   final isValid = await _paymentBridge.validateCard();
 
-  void _showSavedCardSheet() async {
-    // Example saved card - in production, fetch from backend
-    // The paymentSourceId should be the Checkout.com source ID from previous tokenization
-    final savedCard = SavedCardConfig(
-      paymentSourceId:
-          'src_test_example', // TODO: Replace with real source ID from backend
-      last4: '4242',
-      scheme: 'visa',
-      expiryMonth: 12,
-      expiryYear: 2025,
-      cardholderName: 'John Doe',
-    );
+  //   if (!isValid) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Please check your card details'),
+  //           backgroundColor: Colors.orange,
+  //         ),
+  //       );
+  //     }
+  //     return;
+  //   }
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder:
-          (context) => _SavedCardBottomSheet(
-            paymentConfig: _paymentConfig,
-            savedCardConfig: savedCard,
-            onProcessing: (processing) {
-              setState(() => _isProcessing = processing);
-            },
-          ),
-    );
-  }
+  //   // Trigger tokenization
+  //   await _paymentBridge.tokenizeCard();
+  // }
+
+  // void _showSavedCardSheet() async {
+  //   // Example saved card - in production, fetch from backend
+  //   // The paymentSourceId should be the Checkout.com source ID from previous tokenization
+  //   final savedCard = SavedCardConfig(
+  //     paymentSourceId: 'src_test_example',
+  //     last4: '4242',
+  //     scheme: 'visa',
+  //     expiryMonth: 12,
+  //     expiryYear: 2025,
+  //     cardholderName: 'John Doe',
+  //   );
+
+  //   showModalBottomSheet(
+  //     context: context,
+  //     isScrollControlled: true,
+  //     backgroundColor: Colors.transparent,
+  //     builder:
+  //         (context) => _SavedCardBottomSheet(
+  //           paymentConfig: _paymentConfig,
+  //           savedCardConfig: savedCard,
+  //           onProcessing: (processing) {
+  //             setState(() => _isProcessing = processing);
+  //           },
+  //         ),
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -255,33 +247,35 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
             const SizedBox(height: 32),
 
-            // Card Payment Button
-            _PaymentMethodButton(
-              icon: Icons.credit_card,
-              label: 'Pay with Card',
-              description: 'Enter card details securely',
-              onTap: _showCardSheet,
-              color: Colors.blue,
+            SizedBox(
+              height: 350,
+              child: CardNativeView(paymentConfig: _paymentConfig),
             ),
+
+            // Card Payment Button
+            // _PaymentMethodButton(
+            //   icon: Icons.credit_card,
+            //   label: 'Pay with Card',
+            //   description: 'Enter card details securely',
+            //   onTap: _showCardSheet,
+            //   color: Colors.blue,
+            // ),
             const SizedBox(height: 16),
 
             // Saved Card Payment Button
-            _PaymentMethodButton(
-              icon: Icons.credit_card_outlined,
-              label: 'Pay with Saved Card',
-              description: 'Visa •••• 4242 - Enter CVV only',
-              onTap: _showSavedCardSheet,
-              color: Colors.green,
-            ),
-            const SizedBox(height: 16),
+            // _PaymentMethodButton(
+            //   icon: Icons.credit_card_outlined,
+            //   label: 'Pay with Saved Card',
+            //   description: 'Visa •••• 4242 - Enter CVV only',
+            //   onTap: _showSavedCardSheet,
+            //   color: Colors.green,
+            // ),
+            // const SizedBox(height: 16),
 
             // Google Pay Button
-            _GooglePayButton(
-              paymentBridge: _paymentBridge,
-              paymentConfig: _paymentConfig,
-              onProcessing: (processing) {
-                setState(() => _isProcessing = processing);
-              },
+            SizedBox(
+              height: 50,
+              child: GooglePayNativeView(paymentConfig: _paymentConfig),
             ),
 
             const SizedBox(height: 50),
@@ -289,7 +283,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ElevatedButton(
               onPressed:
                   () => _getSessionData(
-                    _isCardSelected
+                    !_isCardSelected
                         ? CurrentPaymentType.card
                         : CurrentPaymentType.googlepay,
                   ),
@@ -322,374 +316,369 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 }
 
-// Payment Method Button Widget
-class _PaymentMethodButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String description;
-  final VoidCallback onTap;
-  final Color color;
+// // Payment Method Button Widget
+// class _PaymentMethodButton extends StatelessWidget {
+//   final IconData icon;
+//   final String label;
+//   final String description;
+//   final VoidCallback onTap;
+//   final Color color;
 
-  const _PaymentMethodButton({
-    required this.icon,
-    required this.label,
-    required this.description,
-    required this.onTap,
-    required this.color,
-  });
+//   const _PaymentMethodButton({
+//     required this.icon,
+//     required this.label,
+//     required this.description,
+//     required this.onTap,
+//     required this.color,
+//   });
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withAlpha(25),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 32),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      description,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Card(
+//       elevation: 2,
+//       child: InkWell(
+//         onTap: onTap,
+//         borderRadius: BorderRadius.circular(12),
+//         child: Padding(
+//           padding: const EdgeInsets.all(16.0),
+//           child: Row(
+//             children: [
+//               Container(
+//                 padding: const EdgeInsets.all(12),
+//                 decoration: BoxDecoration(
+//                   color: color.withAlpha(25),
+//                   borderRadius: BorderRadius.circular(8),
+//                 ),
+//                 child: Icon(icon, color: color, size: 32),
+//               ),
+//               const SizedBox(width: 16),
+//               Expanded(
+//                 child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     Text(
+//                       label,
+//                       style: const TextStyle(
+//                         fontSize: 18,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                     const SizedBox(height: 4),
+//                     Text(
+//                       description,
+//                       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//               const Icon(Icons.arrow_forward_ios, size: 16),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
 
-// Google Pay Button Widget using pay package
-class _GooglePayButton extends StatefulWidget {
-  final PaymentBridge paymentBridge;
-  final PaymentConfig paymentConfig;
-  final Function(bool) onProcessing;
+// // Google Pay Button Widget using pay package
+// class _GooglePayButton extends StatefulWidget {
+//   final PaymentBridge paymentBridge;
+//   final PaymentConfig paymentConfig;
+//   final Function(bool) onProcessing;
 
-  const _GooglePayButton({
-    required this.paymentBridge,
-    required this.paymentConfig,
-    required this.onProcessing,
-  });
+//   const _GooglePayButton({
+//     required this.paymentBridge,
+//     required this.paymentConfig,
+//     required this.onProcessing,
+//   });
 
-  @override
-  State<_GooglePayButton> createState() => _GooglePayButtonState();
-}
+//   @override
+//   State<_GooglePayButton> createState() => _GooglePayButtonState();
+// }
 
-class _GooglePayButtonState extends State<_GooglePayButton> {
-  bool _isInitialized = false;
+// class _GooglePayButtonState extends State<_GooglePayButton> {
+//   bool _isInitialized = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _initializeGooglePayTokenizer();
-  }
+//   @override
+//   void initState() {
+//     super.initState();
+//     _initializeGooglePayTokenizer();
+//   }
 
-  Future<void> _initializeGooglePayTokenizer() async {
-    try {
-      debugPrint('[GooglePayButton] Initializing Google Pay tokenizer');
+//   Future<void> _initializeGooglePayTokenizer() async {
+//     try {
+//       debugPrint('[GooglePayButton] Initializing Google Pay tokenizer');
 
-      final success = await widget.paymentBridge.initGooglePay(
-        widget.paymentConfig,
-        GooglePayConfig(
-          merchantId: publicKey,
-          merchantName: 'Mac Queen',
-          countryCode: 'SA',
-          currencyCode: currency,
-          totalPrice: totalPrice.toInt(),
-        ),
-      );
+//       final success = await widget.paymentBridge.initGooglePay(
+//         widget.paymentConfig,
+//         GooglePayConfig(
+//           merchantId: publicKey,
+//           merchantName: 'Mac Queen',
+//           countryCode: 'SA',
+//           currencyCode: currency,
+//           totalPrice: totalPrice.toInt(),
+//         ),
+//       );
 
-      if (success) {
-        setState(() => _isInitialized = true);
-        debugPrint(
-          '[GooglePayButton] Google Pay tokenizer initialized successfully',
-        );
-      } else {
-        debugPrint(
-          '[GooglePayButton] Failed to initialize Google Pay tokenizer',
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Google Pay is not available'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } catch (e, stackTrace) {
-      debugPrint('[GooglePayButton] Error initializing Google Pay: $e');
-      debugPrint('[GooglePayButton] Stack trace: $stackTrace');
+//       if (success) {
+//         setState(() => _isInitialized = true);
+//         debugPrint(
+//           '[GooglePayButton] Google Pay tokenizer initialized successfully',
+//         );
+//       } else {
+//         debugPrint(
+//           '[GooglePayButton] Failed to initialize Google Pay tokenizer',
+//         );
+//         if (mounted) {
+//           ScaffoldMessenger.of(context).showSnackBar(
+//             const SnackBar(
+//               content: Text('Google Pay is not available'),
+//               backgroundColor: Colors.orange,
+//             ),
+//           );
+//         }
+//       }
+//     } catch (e, stackTrace) {
+//       debugPrint('[GooglePayButton] Error initializing Google Pay: $e');
+//       debugPrint('[GooglePayButton] Stack trace: $stackTrace');
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to initialize Google Pay: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(
+//             content: Text('Failed to initialize Google Pay: $e'),
+//             backgroundColor: Colors.red,
+//           ),
+//         );
+//       }
+//     }
+//   }
 
-  void _onGooglePayResult(Map<String, dynamic> result) async {
-    widget.onProcessing(true);
-    debugPrint('[GooglePayButton] Received Google Pay result');
+//   @override
+//   Widget build(BuildContext context) {
+//     if (!_isInitialized) {
+//       return const Center(child: CircularProgressIndicator());
+//     }
 
-    try {
-      // Validate result
-      if (result.isEmpty) {
-        throw Exception('Empty payment result received');
-      }
+//     return Card(
+//       elevation: 2,
+//       child: Padding(
+//         padding: const EdgeInsets.all(16.0),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Row(
+//               children: [
+//                 const Text(
+//                   'Google Pay',
+//                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+//                 ),
+//                 const Spacer(),
+//                 Text(
+//                   '$currency $totalPrice',
+//                   style: const TextStyle(fontSize: 16),
+//                 ),
+//               ],
+//             ),
+//             const SizedBox(height: 16),
 
-      // Extract payment data
-      final paymentData = json.encode(result);
-      debugPrint('[GooglePayButton] Sending payment data for tokenization');
+//             // Google Pay Native View (shows the button)
 
-      // Send to native platform for Checkout SDK tokenization with timeout
-      await widget.paymentBridge
-          .tokenizeGooglePayData(paymentData)
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () {
-              throw TimeoutException('Tokenization timed out after 30 seconds');
-            },
-          );
+//           ],
+//         ),
+//       ),
+//     );
+//   }
 
-      debugPrint('[GooglePayButton] Payment data sent successfully');
-      widget.onProcessing(false);
-      _isCardSelected = false;
-      // Note: Actual result will come via callback
-    } on TimeoutException catch (e) {
-      debugPrint('[GooglePayButton] Timeout error: $e');
-      widget.onProcessing(false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Payment request timed out. Please try again.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    } catch (e, stackTrace) {
-      debugPrint('[GooglePayButton] Payment processing error: $e');
-      debugPrint('[GooglePayButton] Stack trace: $stackTrace');
-      widget.onProcessing(false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Payment processing failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
+//   /// Manually trigger Google Pay tokenization
+//   /// This will get both the token result and session data
+//   Future<void> _tokenizeGooglePay() async {
+//     widget.onProcessing(true);
+//     debugPrint('[GooglePayButton] Manually triggering Google Pay tokenization');
 
-  PaymentConfiguration _getGooglePaymentConfig() {
-    return PaymentConfiguration.fromJsonString(
-      kGooglePaymentConfig(
-        publicKey: publicKey,
-        totalPrice: totalPrice,
-        currencyCode: currency,
-        envMode: envMode,
-      ),
-    );
-  }
+//     try {
+//       // Call tokenizeGooglePay to get the token
+//       await widget.paymentBridge.tokenizeGooglePay().timeout(
+//         const Duration(seconds: 30),
+//         onTimeout: () {
+//           throw TimeoutException('Tokenization timed out after 30 seconds');
+//         },
+//       );
 
-  @override
-  Widget build(BuildContext context) {
-    if (!_isInitialized) {
-      return const Center(child: CircularProgressIndicator());
-    }
+//       debugPrint(
+//         '[GooglePayButton] Tokenization triggered - waiting for token result...',
+//       );
+//       // Token will be received via onCardTokenized callback
 
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Text(
-                  'Google Pay',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Text(
-                  '$currency $totalPrice',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            GooglePayButton(
-              paymentConfiguration: _getGooglePaymentConfig(),
-              paymentItems: [
-                PaymentItem(
-                  label: 'Total',
-                  amount: totalPrice.toString(),
-                  status: PaymentItemStatus.final_price,
-                ),
-              ],
-              width: double.infinity,
-              height: 50,
-              type: GooglePayButtonType.pay,
-              onPaymentResult: _onGooglePayResult,
-              loadingIndicator: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+//       // Also get session data
+//       await widget.paymentBridge.getGooglePaySessionData().timeout(
+//         const Duration(seconds: 30),
+//         onTimeout: () {
+//           throw TimeoutException(
+//             'Session data retrieval timed out after 30 seconds',
+//           );
+//         },
+//       );
 
-// Card Bottom Sheet
-class _CardBottomSheet extends StatefulWidget {
-  final PaymentConfig paymentConfig;
-  final Function(bool) onProcessing;
-  final VoidCallback onInitialized;
+//       debugPrint(
+//         '[GooglePayButton] Session data retrieval triggered - waiting for session data...',
+//       );
+//       // Session data will be received via onSessionData callback
 
-  const _CardBottomSheet({
-    required this.paymentConfig,
-    required this.onProcessing,
-    required this.onInitialized,
-  });
+//       widget.onProcessing(false);
+//       _isCardSelected = false;
 
-  @override
-  State<_CardBottomSheet> createState() => _CardBottomSheetState();
-}
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(
+//             content: Text(
+//               'Google Pay tokenization initiated - check console for results',
+//             ),
+//             backgroundColor: Colors.green,
+//           ),
+//         );
+//       }
+//     } on TimeoutException catch (e) {
+//       debugPrint('[GooglePayButton] Timeout error: $e');
+//       widget.onProcessing(false);
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(
+//             content: Text('Request timed out. Please try again.'),
+//             backgroundColor: Colors.orange,
+//           ),
+//         );
+//       }
+//     } catch (e, stackTrace) {
+//       debugPrint('[GooglePayButton] Error during tokenization: $e');
+//       debugPrint('[GooglePayButton] Stack trace: $stackTrace');
+//       widget.onProcessing(false);
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           SnackBar(
+//             content: Text('Tokenization failed: ${e.toString()}'),
+//             backgroundColor: Colors.red,
+//           ),
+//         );
+//       }
+//     }
+//   }
+// }
 
-class _CardBottomSheetState extends State<_CardBottomSheet> {
-  final PaymentBridge _paymentBridge = PaymentBridge();
+// // Card Bottom Sheet
+// class _CardBottomSheet extends StatefulWidget {
+//   final PaymentConfig paymentConfig;
+//   final Function(bool) onProcessing;
+//   final VoidCallback onInitialized;
 
-  Future<void> _tokenizeCard() async {
-    widget.onProcessing(true);
+//   const _CardBottomSheet({
+//     required this.paymentConfig,
+//     required this.onProcessing,
+//     required this.onInitialized,
+//   });
 
-    // Validate card first
-    final isValid = await _paymentBridge.validateCard();
+//   @override
+//   State<_CardBottomSheet> createState() => _CardBottomSheetState();
+// }
 
-    if (!isValid) {
-      widget.onProcessing(false);
+// class _CardBottomSheetState extends State<_CardBottomSheet> {
+//   final PaymentBridge _paymentBridge = PaymentBridge();
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please check your card details'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-      _isCardSelected = true;
-      return;
-    }
+// Future<void> _tokenizeCard() async {
+//   widget.onProcessing(true);
 
-    // Trigger tokenization
-    await _paymentBridge.tokenizeCard();
-    // The _isProcessing state will be reset by the callback in parent
+//   // Validate card first
+//   final isValid = await _paymentBridge.validateCard();
 
-    widget.onProcessing(false);
-  }
+//   if (!isValid) {
+//     widget.onProcessing(false);
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        left: 16,
-        right: 16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
+//     if (mounted) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(
+//           content: Text('Please check your card details'),
+//           backgroundColor: Colors.orange,
+//         ),
+//       );
+//     }
+//     return;
+//   }
 
-          // Title
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Card Payment',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-          ),
+//   // Trigger tokenization
+//   await _paymentBridge.tokenizeCard();
+//   // The _isProcessing state will be reset by the callback in parent
 
-          // Card view
-          SizedBox(
-            height: 350,
-            child: _PlatformCardView(paymentConfig: widget.paymentConfig),
-          ),
+//   widget.onProcessing(false);
+//   _isCardSelected = true;
+// }
 
-          const SizedBox(height: 16),
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       decoration: const BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+//       ),
+//       padding: EdgeInsets.only(
+//         bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+//         left: 16,
+//         right: 16,
+//       ),
+//       child: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         children: [
+//           // Handle bar
+//           Container(
+//             margin: const EdgeInsets.only(top: 12, bottom: 8),
+//             width: 40,
+//             height: 4,
+//             decoration: BoxDecoration(
+//               color: Colors.grey[300],
+//               borderRadius: BorderRadius.circular(2),
+//             ),
+//           ),
 
-          // Tokenize Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _tokenizeCard,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                elevation: 2,
-              ),
-              child: const Text(
-                'Tokenize Card',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+//           // Title
+//           const Padding(
+//             padding: EdgeInsets.all(16.0),
+//             child: Text(
+//               'Card Payment',
+//               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+//             ),
+//           ),
+
+//           // Card view
+//           SizedBox(
+//             height: 350,
+//             child: CardNativeView(paymentConfig: widget.paymentConfig),
+//           ),
+
+//           const SizedBox(height: 16),
+
+//           // Tokenize Button
+//           SizedBox(
+//             width: double.infinity,
+//             height: 50,
+//             child: ElevatedButton(
+//               onPressed: _tokenizeCard,
+//               style: ElevatedButton.styleFrom(
+//                 backgroundColor: Colors.blue,
+//                 foregroundColor: Colors.white,
+//                 shape: RoundedRectangleBorder(
+//                   borderRadius: BorderRadius.circular(8),
+//                 ),
+//                 elevation: 2,
+//               ),
+//               child: const Text(
+//                 'Tokenize Card',
+//                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
 
 // Saved Card Bottom Sheet
 class _SavedCardBottomSheet extends StatefulWidget {
@@ -847,7 +836,7 @@ class _SavedCardBottomSheetState extends State<_SavedCardBottomSheet> {
           if (_isInitialized)
             SizedBox(
               height: 200,
-              child: _PlatformCardView(paymentConfig: widget.paymentConfig),
+              child: CardNativeView(paymentConfig: widget.paymentConfig),
             )
           else
             const SizedBox(
@@ -880,34 +869,5 @@ class _SavedCardBottomSheetState extends State<_SavedCardBottomSheet> {
         ],
       ),
     );
-  }
-}
-
-// Platform Card View
-class _PlatformCardView extends StatelessWidget {
-  final PaymentConfig paymentConfig;
-
-  const _PlatformCardView({required this.paymentConfig});
-
-  @override
-  Widget build(BuildContext context) {
-    const viewType = 'flow_card_view';
-    final creationParams = paymentConfig.toMap();
-
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return AndroidView(
-        viewType: viewType,
-        creationParams: creationParams,
-        creationParamsCodec: const StandardMessageCodec(),
-      );
-    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return UiKitView(
-        viewType: 'flow_view_card',
-        creationParams: creationParams,
-        creationParamsCodec: const StandardMessageCodec(),
-      );
-    }
-
-    return const SizedBox.shrink();
   }
 }

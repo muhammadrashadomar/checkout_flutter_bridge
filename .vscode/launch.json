@@ -1,0 +1,45 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Flow-Flutter",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "Flow-Flutter (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "Flow-Flutter (release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "checkout_flutter_bridge",
+            "cwd": "checkout_flutter_bridge",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "checkout_flutter_bridge (profile mode)",
+            "cwd": "checkout_flutter_bridge",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "checkout_flutter_bridge (release mode)",
+            "cwd": "checkout_flutter_bridge",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}

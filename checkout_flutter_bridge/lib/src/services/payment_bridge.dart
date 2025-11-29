@@ -321,6 +321,24 @@ class PaymentBridge {
     }
   }
 
+  /// Tokenize Google Pay - triggers the native Google Pay component to tokenize
+  /// The tokenization result will be sent via the onCardTokenized callback
+  Future<void> tokenizeGooglePay() async {
+    try {
+      ConsoleLogger.payment('Requesting Google Pay tokenization...');
+      await _channel.invokeMethod('tokenizeGooglePay');
+      // Result will come via onCardTokenized callback
+    } on PlatformException catch (e) {
+      ConsoleLogger.error('Tokenize Google Pay failed: ${e.message}');
+      onPaymentError?.call(
+        PaymentErrorResult(
+          errorCode: e.code,
+          errorMessage: e.message ?? 'Google Pay tokenization failed',
+        ),
+      );
+    }
+  }
+
   /// Get Google Pay session data
   Future<void> getGooglePaySessionData() async {
     try {

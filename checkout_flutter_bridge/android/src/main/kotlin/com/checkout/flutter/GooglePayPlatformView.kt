@@ -13,7 +13,11 @@ import com.checkout.components.interfaces.api.CheckoutComponents
 import com.checkout.components.interfaces.api.PaymentMethodComponent
 import com.checkout.components.interfaces.component.CheckoutComponentConfiguration
 import com.checkout.components.interfaces.component.ComponentCallback
+import com.checkout.components.interfaces.component.ComponentOption
+import com.checkout.components.interfaces.component.PaymentButtonAction
 import com.checkout.components.interfaces.error.CheckoutError
+import com.checkout.components.interfaces.model.ApiCallResult
+import com.checkout.components.interfaces.model.CallbackResult
 import com.checkout.components.interfaces.model.PaymentMethodName
 import com.checkout.components.interfaces.model.PaymentSessionResponse
 import com.checkout.components.wallet.wrapper.GooglePayFlowCoordinator
@@ -30,7 +34,6 @@ import kotlinx.coroutines.*
  * Flutter layer with no native UI button rendering.
  *
  * Architecture:
- * - NO native Google Pay button (Flutter renders button via pay package)
  * - Only exposes payment sheet logic
  * - Called via method channel from Flutter
  * - Sends results back via callbacks
@@ -115,20 +118,39 @@ class GooglePayPlatformView(
         val componentCallback =
                 ComponentCallback(
                         onReady = { component -> Log.d(TAG, "Component ready: ${component.name}") },
-                        onSubmit = { component ->
-                            Log.d(TAG, "Component submitted: ${component.name}")
+                        handleSubmit = { sessionData ->
+                            Log.d(TAG, "handleSubmit - sending session data to Flutter")
+                            sendSessionData(sessionData)
+                            // Return Failure to prevent SDK from completing payment automatically
+                            ApiCallResult.Failure
+                        },
+                        onSubmit = { component -> Log.d(TAG, "GPay submitted: ${component.name}") },
+                        onTokenized = { result ->
+                            Log.d(TAG, "onTokenized - sending tokenization result to Flutter")
+                            sendTokenizationResult(result.data)
+
+                            // Return Accepted to prevent SDK from completing payment automatically
+                            CallbackResult.Accepted
                         },
                         onSuccess = { _, paymentID ->
                             Log.i(TAG, "Payment successful")
                             sendPaymentSuccess(paymentID)
                         },
-                        onError = { _, checkoutError ->
-                            Log.e(TAG, "Payment error: ${checkoutError.code}")
-                            sendError(ErrorCode.PAYMENT_ERROR, checkoutError.message)
+                        onError = { _, error ->
+                            Log.e(TAG, "Payment error: ${error.message}")
+                            sendError(ErrorCode.PAYMENT_ERROR, error.message ?: "Payment failed")
                         }
                 )
 
         val flowCoordinators = mapOf(PaymentMethodName.GooglePay to coordinator)
+
+        // Configure component options to trigger tokenization
+        val componentOption =
+                ComponentOption(
+                        showPayButton = true,
+                        paymentButtonAction = PaymentButtonAction.TOKENIZE
+                )
+        val componentOptionsMap = mapOf(PaymentMethodName.GooglePay to componentOption)
 
         // Build configuration
         val configuration =
@@ -139,7 +161,8 @@ class GooglePayPlatformView(
                         publicKey = publicKey!!,
                         environment = environment,
                         flowCoordinators = flowCoordinators,
-                        componentCallback = componentCallback
+                        componentCallback = componentCallback,
+                        componentOptions = componentOptionsMap
                 )
 
         container.setViewTreeLifecycleOwner(activity)
@@ -149,7 +172,10 @@ class GooglePayPlatformView(
             try {
                 withTimeout(INITIALIZATION_TIMEOUT_MS) {
                     checkoutComponents = CheckoutComponentsFactory(config = configuration).create()
-                    googlePayComponent = checkoutComponents.create(PaymentMethodName.GooglePay)
+                    googlePayComponent =
+                            checkoutComponents.create(
+                                    PaymentMethodName.GooglePay,
+                            )
 
                     // Check if Google Pay is available (suspend call)
                     val isAvailable = googlePayComponent.isAvailable()
@@ -249,59 +275,6 @@ class GooglePayPlatformView(
         }
     }
 
-    /**
-     * Launch Google Pay payment sheet Called from Flutter via method channel
-     *
-     * @param result MethodChannel result to send response back to Flutter
-     */
-    fun launchPaymentSheet(result: MethodChannel.Result) {
-        // Validate state
-        if (!isInitialized.get() || !::googlePayComponent.isInitialized) {
-            Log.e(TAG, "Launch failed: Component not ready")
-            safeResultError(
-                    result,
-                    ErrorCode.INVALID_STATE.name,
-                    "Google Pay component not initialized",
-                    null
-            )
-            return
-        }
-
-        scope.launch {
-            try {
-                Log.d(TAG, "Launching Google Pay payment sheet")
-
-                withTimeout(LAUNCH_TIMEOUT_MS) {
-                    // The Checkout.com SDK handles the sheet internally
-                    // Result will come via callbacks
-                    withContext(Dispatchers.Main) {
-                        safeResultSuccess(result, mapOf("status" to "launched"))
-                    }
-                }
-            } catch (e: TimeoutCancellationException) {
-                Log.e(TAG, "Launch timeout")
-                withContext(Dispatchers.Main) {
-                    safeResultError(
-                            result,
-                            ErrorCode.TIMEOUT.name,
-                            "Launch timed out after ${LAUNCH_TIMEOUT_MS}ms",
-                            null
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Launch error: ${e.javaClass.simpleName}", e)
-                withContext(Dispatchers.Main) {
-                    safeResultError(
-                            result,
-                            ErrorCode.LAUNCH_FAILED.name,
-                            e.message ?: "Failed to launch Google Pay",
-                            null
-                    )
-                }
-            }
-        }
-    }
-
     // ==================== CALLBACK METHODS (Send to Flutter) ====================
 
     /**
@@ -338,7 +311,121 @@ class GooglePayPlatformView(
         }
     }
 
+    /**
+     * Send session data to Flutter
+     *
+     * @param sessionData Session data string from SDK
+     */
+    private fun sendSessionData(sessionData: String) {
+        runOnMainThread {
+            try {
+                val data = mapOf("sessionData" to sessionData)
+                channel.invokeMethod("sessionDataReady", data)
+                Log.d(TAG, "Session data sent to Flutter successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send session data event", e)
+            }
+        }
+    }
+
+    /**
+     * Send tokenization result to Flutter
+     *
+     * @param tokenData The token data from SDK
+     */
+    private fun sendTokenizationResult(tokenData: Any?) {
+        runOnMainThread {
+            try {
+                // Convert TokenDetails to Map (similar to Card implementation)
+                val tokenDetailsMap =
+                        when (tokenData) {
+                            is com.checkout.components.interfaces.model.TokenDetails -> {
+                                mapOf(
+                                        "type" to tokenData.type,
+                                        "token" to tokenData.token,
+                                        "expiresOn" to tokenData.expiresOn,
+                                        "expiryMonth" to tokenData.expiryMonth,
+                                        "expiryYear" to tokenData.expiryYear,
+                                        "scheme" to tokenData.scheme,
+                                        "last4" to tokenData.last4,
+                                        "bin" to tokenData.bin,
+                                        "cardType" to tokenData.cardType,
+                                        "cardCategory" to tokenData.cardCategory
+                                )
+                            }
+                            else -> {
+                                Log.w(TAG, "Unknown token data type: ${tokenData?.javaClass}")
+                                mapOf("raw" to tokenData.toString())
+                            }
+                        }
+
+                val data = mapOf("tokenDetails" to tokenDetailsMap)
+                channel.invokeMethod("cardTokenized", data)
+                Log.d(TAG, "Tokenization result sent to Flutter successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send tokenization result", e)
+            }
+        }
+    }
+
     // ==================== PRIVATE HELPER METHODS ====================
+
+    /**
+     * Tokenize Google Pay - called from Flutter via method channel
+     *
+     * This triggers the component's submit() which will call onTokenized callback The tokenization
+     * result is sent back to Flutter through sendTokenizationResult()
+     *
+     * @param result MethodChannel result to send response back to Flutter
+     */
+    fun tokenizeGooglePay(result: MethodChannel.Result) {
+        // Validate state
+        if (!isInitialized.get()) {
+            Log.e(TAG, "Tokenization failed: Google Pay component not initialized")
+            result.error(ErrorCode.INVALID_STATE.name, "Google Pay component not initialized", null)
+            return
+        }
+
+        if (!::googlePayComponent.isInitialized) {
+            Log.e(TAG, "Tokenization failed: Google Pay component not ready")
+            result.error(ErrorCode.INVALID_STATE.name, "Google Pay component not ready", null)
+            return
+        }
+
+        Log.d(TAG, "Starting Google Pay tokenization...")
+
+        scope.launch {
+            try {
+                withTimeout(TOKENIZATION_TIMEOUT_MS) {
+                    // Trigger tokenization by calling submit on the component
+                    // This will call the onTokenized callback which sends data to Flutter
+                    withContext(Dispatchers.Default) { googlePayComponent.tokenize() }
+
+                    Log.i(
+                            TAG,
+                            "Google Pay submit called - tokenization result will be sent via callback"
+                    )
+
+                    // Notify method call success (actual token comes via onTokenized callback)
+                    result.success(true)
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                Log.e(TAG, "Tokenization timeout")
+                result.error(
+                        ErrorCode.TIMEOUT.name,
+                        "Tokenization timed out after ${TOKENIZATION_TIMEOUT_MS}ms",
+                        null
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error tokenizing Google Pay: ${e.javaClass.simpleName}", e)
+                result.error(
+                        ErrorCode.TOKENIZATION_FAILED.name,
+                        "Failed to tokenize: ${e.message}",
+                        null
+                )
+            }
+        }
+    }
 
     /**
      * Validate required initialization parameters
@@ -375,33 +462,6 @@ class GooglePayPlatformView(
         }
     }
 
-    /** Safely invoke result.success() ensuring it's only called once */
-    private fun safeResultSuccess(result: MethodChannel.Result, value: Any?) {
-        try {
-            result.success(value)
-        } catch (e: IllegalStateException) {
-            Log.w(TAG, "Result already sent, ignoring duplicate success call")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending result success", e)
-        }
-    }
-
-    /** Safely invoke result.error() ensuring it's only called once */
-    private fun safeResultError(
-            result: MethodChannel.Result,
-            errorCode: String,
-            errorMessage: String?,
-            errorDetails: Any?
-    ) {
-        try {
-            result.error(errorCode, errorMessage, errorDetails)
-        } catch (e: IllegalStateException) {
-            Log.w(TAG, "Result already sent, ignoring duplicate error call")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending result error", e)
-        }
-    }
-
     // ==================== LIFECYCLE METHODS ====================
 
     override fun getView(): FrameLayout = container
@@ -426,8 +486,8 @@ class GooglePayPlatformView(
         TIMEOUT,
         GOOGLEPAY_UNAVAILABLE,
         INVALID_STATE,
-        LAUNCH_FAILED,
-        PAYMENT_ERROR
+        PAYMENT_ERROR,
+        TOKENIZATION_FAILED
     }
 
     /** Custom exception for Google Pay specific errors */
@@ -437,9 +497,7 @@ class GooglePayPlatformView(
     companion object {
         private const val TAG = "GooglePayPlatformView"
         private const val CHANNEL_NAME = "checkout_bridge"
-
-        // Timeout constants (in milliseconds)
         private const val INITIALIZATION_TIMEOUT_MS = 30000L // 30 seconds
-        private const val LAUNCH_TIMEOUT_MS = 5000L // 5 seconds
+        private const val TOKENIZATION_TIMEOUT_MS = 15000L // 15 seconds
     }
 }

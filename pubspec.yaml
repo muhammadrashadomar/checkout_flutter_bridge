@@ -35,8 +35,6 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   
-  # Google Pay integration
-  pay: ^3.3.0
 
   # Checkout Flutter Bridge
   checkout_flutter_bridge:
