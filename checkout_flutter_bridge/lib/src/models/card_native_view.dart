@@ -5,8 +5,13 @@ import 'package:flutter/services.dart';
 
 class CardNativeView extends StatelessWidget {
   final PaymentConfig paymentConfig;
+  final Function(int)? onPlatformViewCreated;
 
-  const CardNativeView({super.key, required this.paymentConfig});
+  const CardNativeView({
+    super.key,
+    required this.paymentConfig,
+    this.onPlatformViewCreated,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -18,12 +23,14 @@ class CardNativeView extends StatelessWidget {
         viewType: viewType.name,
         creationParams: creationParams,
         creationParamsCodec: const StandardMessageCodec(),
+        onPlatformViewCreated: (int id) {},
       );
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       return UiKitView(
         viewType: viewType.name,
         creationParams: creationParams,
         creationParamsCodec: const StandardMessageCodec(),
+        onPlatformViewCreated: (int id) {},
       );
     }
 

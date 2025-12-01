@@ -4,14 +4,15 @@ version '1.0'
 buildscript {
     ext.kotlin_version = '2.1.0'
     ext.checkout_version = '1.2.0'
+
     repositories {
         google()
         mavenCentral()
-   }
+    }
 
     dependencies {
         classpath 'com.android.tools.build:gradle:8.7.3'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
 
@@ -27,14 +28,6 @@ rootProject.allprojects {
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
-// Note: Applying the Kotlin Compose Gradle plugin here can cause "Plugin with id
-// 'org.jetbrains.kotlin.plugin.compose' not found" errors when this package is added
-// as a git/pub dependency to an external project that doesn't provide the plugin
-// resolution. Compose is enabled below via `buildFeatures { compose = true }` and
-// the required Compose runtime/compiler should be provided by the consuming app.
-// If you intentionally need the Kotlin Compose Gradle plugin, enable it in the
-// consuming application's pluginManagement or remove this comment and re-enable
-// the line below.
 apply plugin: 'org.jetbrains.kotlin.plugin.compose' // ← REQUIRED for Kotlin 2.0+
 
 android {
@@ -76,7 +69,6 @@ dependencies {
     implementation "androidx.activity:activity-ktx:1.10.1"
     implementation "androidx.activity:activity-compose:1.10.1"
     implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7"
-    implementation "androidx.lifecycle:lifecycle-extensions:2.2.0"
     implementation "androidx.savedstate:savedstate:1.2.1"
     
     // Compose BOM

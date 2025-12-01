@@ -20,6 +20,8 @@ class PaymentBridge {
   Function(PaymentSuccessResult)? onPaymentSuccess;
   Function(PaymentErrorResult)? onPaymentError;
   Function(String)? onSessionData;
+  Function()? onCardReady;
+  Function(bool)? onValidationChanged;
 
   /// Initialize the payment bridge and set up method call handler
   void initialize() {
@@ -45,6 +47,14 @@ class PaymentBridge {
 
       case 'sessionDataReady':
         _handleSessionDataReady(call.arguments);
+        break;
+
+      case 'cardReady':
+        _handleCardReady();
+        break;
+
+      case 'validationChanged':
+        _handleValidationChanged(call.arguments);
         break;
 
       default:
@@ -119,6 +129,28 @@ class PaymentBridge {
       }
     } catch (e) {
       ConsoleLogger.error('Error processing session data: $e');
+    }
+  }
+
+  void _handleCardReady() {
+    ConsoleLogger.success('Card view ready');
+    onCardReady?.call();
+  }
+
+  void _handleValidationChanged(dynamic arguments) {
+    if (arguments == null) {
+      ConsoleLogger.error('validationChanged arguments are null!');
+      return;
+    }
+
+    try {
+      final args = Map<String, dynamic>.from(arguments as Map);
+      final isValid = args['isValid'] as bool? ?? false;
+
+      ConsoleLogger.debug('Validation state changed: $isValid');
+      onValidationChanged?.call(isValid);
+    } catch (e) {
+      ConsoleLogger.error('Error processing validation change: $e');
     }
   }
 
@@ -364,6 +396,8 @@ class PaymentBridge {
     onPaymentSuccess = null;
     onPaymentError = null;
     onSessionData = null;
+    onCardReady = null;
+    onValidationChanged = null;
   }
 
   /// Clear payment type tracker

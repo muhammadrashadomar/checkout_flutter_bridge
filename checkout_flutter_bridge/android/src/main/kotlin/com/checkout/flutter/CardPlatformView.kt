@@ -4,7 +4,6 @@ import android.app.Activity
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.widget.FrameLayout
 import androidx.compose.ui.platform.ComposeView
 import com.checkout.components.core.CheckoutComponentsFactory
 import com.checkout.components.interfaces.Environment
@@ -46,13 +45,14 @@ import kotlinx.coroutines.*
 class CardPlatformView(private val activity: Activity, args: Any?, messenger: BinaryMessenger) :
         PlatformView {
 
-        private val container = FrameLayout(activity)
+        private val container = android.widget.FrameLayout(activity)
         private val channel = MethodChannel(messenger, CHANNEL_NAME)
         private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
         private lateinit var checkoutComponents: CheckoutComponents
         private lateinit var cardComponent: PaymentMethodComponent
 
         @Volatile private var isInitialized = false
+        @Volatile private var isCardValid = false
 
         companion object {
                 private const val TAG = "CardPlatformView"
@@ -170,6 +170,12 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                                         TAG,
                                                         "Card component initialized successfully"
                                                 )
+
+                                                // Notify Flutter that card view is ready
+                                                sendCardReady()
+
+                                                // Start monitoring validation state
+                                                startValidationMonitoring()
                                         }
                                 } else {
                                         sendError(
@@ -190,7 +196,11 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
 
         private fun createComponentCallback(): ComponentCallback {
                 return ComponentCallback(
-                        onReady = { component -> Log.d(TAG, "Component ready: ${component.name}") },
+                        onReady = { component ->
+                                Log.d(TAG, "Component ready: ${component.name}")
+                                // Note: Actual ready notification is sent after view is added to
+                                // container
+                        },
                         handleSubmit = { sessionData ->
                                 Log.d(TAG, "[Flow-Card]: sessionData fetched successfully")
 
@@ -275,18 +285,51 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
         // ==================== PUBLIC METHODS (Called from MainActivity) ====================
 
         /**
-         * Validate card input
-         * @return true if card input is valid
+         * Start monitoring card validation state Since SDK doesn't provide onValidation callback,
+         * we poll for changes
          */
-        fun validateCard(): Boolean {
+        private fun startValidationMonitoring() {
+                scope.launch {
+                        while (isInitialized) {
+                                try {
+                                        val currentValidity = checkCardValidity()
+                                        if (currentValidity != isCardValid) {
+                                                isCardValid = currentValidity
+                                                sendValidationState(currentValidity)
+                                        }
+                                        delay(500) // Check every 500ms
+                                } catch (e: Exception) {
+                                        Log.e(TAG, "Error checking validation: ${e.message}")
+                                        delay(1000) // Wait longer on error
+                                }
+                        }
+                }
+        }
+
+        /**
+         * Check if card input is currently valid
+         * @return true if all card fields are valid
+         */
+        private suspend fun checkCardValidity(): Boolean {
                 if (!isInitialized || !::cardComponent.isInitialized) {
-                        Log.w(TAG, "Card component not initialized for validation")
                         return false
                 }
 
-                // TODO: Implement actual validation if SDK provides method
-                // For now, we'll assume it's valid if initialized
-                return true
+                return try {
+                        // Use SDK's validation method
+                        cardComponent.isValid()
+                } catch (e: Exception) {
+                        Log.e(TAG, "Error checking card validity: ${e.message}", e)
+                        false
+                }
+        }
+
+        /**
+         * Validate card input Note: This is a blocking method that calls the suspend function
+         * @return true if card input is valid
+         */
+        fun validateCard(): Boolean {
+                return runBlocking { checkCardValidity() }
         }
 
         /**
@@ -447,6 +490,31 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                 }
         }
 
+        /* Send card ready event to Flutter */
+        private fun sendCardReady() {
+                runOnMainThread {
+                        try {
+                                channel.invokeMethod("cardReady", null)
+                                Log.d(TAG, "Card ready event sent to Flutter")
+                        } catch (e: Exception) {
+                                Log.e(TAG, "Failed to send card ready event: ${e.message}", e)
+                        }
+                }
+        }
+
+        /* Send validation state change to Flutter */
+        private fun sendValidationState(isValid: Boolean) {
+                runOnMainThread {
+                        try {
+                                val data = mapOf("isValid" to isValid)
+                                channel.invokeMethod("validationChanged", data)
+                                Log.d(TAG, "Validation state sent to Flutter: $isValid")
+                        } catch (e: Exception) {
+                                Log.e(TAG, "Failed to send validation state: ${e.message}", e)
+                        }
+                }
+        }
+
         /* Send payment success event to Flutter */
         private fun sendPaymentSuccess(paymentId: String) {
                 runOnMainThread {
@@ -483,7 +551,7 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
 
         // ==================== LIFECYCLE METHODS ====================
 
-        override fun getView(): FrameLayout = container
+        override fun getView(): android.widget.FrameLayout = container
 
         override fun dispose() {
                 scope.cancel()
