@@ -27,7 +27,7 @@ import 'package:flutter/material.dart';
 ///   onError: (error) => _showError(error.errorMessage),
 /// )
 ///
-/// // Enable pay button after ready
+/// Enable pay button after ready
 /// ElevatedButton(
 ///   onPressed: _isReady ? _handlePayment : null,
 ///   child: Text('Pay'),

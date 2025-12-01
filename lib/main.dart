@@ -2,9 +2,9 @@ import 'package:checkout_flutter_bridge/checkout_flutter_bridge.dart';
 import 'package:flutter/material.dart';
 
 // Google Pay Configuration
-const String paymentSessionId = 'ps_36EZ1FJcuakPbHaPEJncWKa4fCv';
-const String paymentSessionSecret = 'pss_cc3c2e54-235c-4845-8ade-452fa048cfb4';
-const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
+const String paymentSessionId = 'ps_36EnX37ba2rnCrXyjd3i3VYVJT9';
+const String paymentSessionSecret = 'pss_51352b45-9839-47a9-92b4-c7aa272f3b67';
+const String publicKey = 'pk_sbox_abveb2d5jdvf5sompdwbgyndjm5';
 
 // Payment configuration
 final _paymentConfig = PaymentConfig(
@@ -192,21 +192,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ),
 
-            // //! Submit Button ---------------------------------------------
-            // if (currentPaymentType.isCardSelected)
-            //   ElevatedButton(
-            //     onPressed: () => _getSessionData(CurrentPaymentType.card),
-            //     style: ElevatedButton.styleFrom(
-            //       backgroundColor: Colors.blue,
-            //       foregroundColor: Colors.white,
-            //     ),
-            //     child: const Text('Pay'),
-            //   ),
-
             // Card payment view
             CheckoutCardView(paymentConfig: _paymentConfig),
 
-            // else if (currentPaymentType.isGooglePaySelected)
+            // Google Pay view
+            // CheckoutGooglePayView(paymentConfig: _paymentConfig),
           ],
         ),
       ),
@@ -283,6 +273,75 @@ class _CheckoutCardViewState extends State<CheckoutCardView> {
             disabledBackgroundColor: Colors.grey,
           ),
           child: Text(_canPay ? 'Pay Now' : 'Loading...'),
+        ),
+      ],
+    );
+  }
+}
+
+class CheckoutGooglePayView extends StatelessWidget {
+  const CheckoutGooglePayView({super.key, required this.paymentConfig});
+
+  final PaymentConfig paymentConfig;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      spacing: 16,
+      children: [
+        CheckoutFlowGooglePayView(
+          paymentConfig: paymentConfig,
+          onCardTokenized: (CardTokenResult result) {
+            ConsoleLogger.success(
+              '[Flow-Card] Card tokenized: ${result.token}',
+            );
+          },
+          onSessionData: (String sessionData) {
+            ConsoleLogger.success('[Flow-Card] Session data ready');
+          },
+          onError: (PaymentErrorResult error) {
+            // Example: Using the error type enum for better error handling
+            ConsoleLogger.error(
+              '[Flow-GPay] ${error.errorType.name}: ${error.errorMessage}',
+            );
+
+            // Type-safe error handling
+            String errorTitle = 'Payment Error';
+            String errorMessage = error.userFriendlyMessage;
+            Color backgroundColor = Colors.red;
+
+            // Categorize errors using the enum
+            if (error.isGooglePayError) {
+              errorTitle = 'Google Pay Error';
+              backgroundColor = Colors.orange;
+            } else if (error.isInitializationError) {
+              errorTitle = 'Initialization Error';
+              errorMessage = 'Failed to initialize payment. Please try again.';
+            } else if (error.isRetryable) {
+              errorMessage += '\nPlease try again.';
+            }
+
+            // Show error to user with enhanced information
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        errorTitle,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(errorMessage),
+                    ],
+                  ),
+                  backgroundColor: backgroundColor,
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+            }
+          },
         ),
       ],
     );

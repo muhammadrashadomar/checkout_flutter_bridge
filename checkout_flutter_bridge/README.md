@@ -32,6 +32,15 @@ Then run:
 flutter pub get
 ```
 
+## Requirements
+
+- **Flutter**: 3.0.0+
+- **Android**:
+  - `minSdk`: 21
+  - `compileSdk`: 35+
+  - **Kotlin**: 2.0.0+ (Required for Jetpack Compose compiler)
+  - **Gradle**: Compatible with Kotlin 2.0+
+
 ## Android Setup
 
 ### 1. Update `build.gradle`
@@ -54,13 +63,18 @@ Add the Google Wallet API metadata:
 </application>
 ```
 
-### 3. Minimum SDK
+### 3. Repository Configuration
 
-Ensure your app's `minSdk` is at least 21 in `android/app/build.gradle`:
+If you encounter dependency resolution errors for the Checkout.com SDK, ensure the following repositories are added to your project's `android/build.gradle` (root level):
 
 ```gradle
-defaultConfig {
-    minSdk 21
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://maven.fpregistry.io/releases' }
+        maven { url 'https://jitpack.io' }
+    }
 }
 ```
 

@@ -1,3 +1,5 @@
+import 'payment_error_code.dart';
+
 /// Payment result models from platform channels
 class CardTokenResult {
   final String token;
@@ -124,22 +126,31 @@ class PaymentSuccessResult {
 class PaymentErrorResult {
   final String errorCode;
   final String errorMessage;
+  final PaymentErrorCode errorType;
   final Map<String, dynamic>? details;
 
   PaymentErrorResult({
     required this.errorCode,
     required this.errorMessage,
+    PaymentErrorCode? errorType,
     this.details,
-  });
+  }) : errorType = errorType ?? PaymentErrorCode.fromString(errorCode);
 
   factory PaymentErrorResult.fromMap(dynamic data) {
     if (data is String) {
       return PaymentErrorResult(errorCode: 'UNKNOWN', errorMessage: data);
     } else if (data is Map) {
       final map = Map<String, dynamic>.from(data);
+      final code =
+          map['errorCode'] as String? ?? map['code'] as String? ?? 'UNKNOWN';
       return PaymentErrorResult(
-        errorCode: map['code'] as String? ?? 'UNKNOWN',
-        errorMessage: map['message'] as String? ?? 'Unknown error',
+        // Native code sends 'errorCode' and 'errorMessage' keys
+        errorCode: code,
+        errorMessage:
+            map['errorMessage'] as String? ??
+            map['message'] as String? ??
+            'Unknown error',
+        errorType: PaymentErrorCode.fromString(code),
         details: map,
       );
     }
@@ -149,9 +160,24 @@ class PaymentErrorResult {
     );
   }
 
+  /// Check if this is a Google Pay error
+  bool get isGooglePayError => errorType.isGooglePayError;
+
+  /// Check if this is a card payment error
+  bool get isCardError => errorType.isCardError;
+
+  /// Check if this is an initialization error
+  bool get isInitializationError => errorType.isInitializationError;
+
+  /// Check if the error is retryable
+  bool get isRetryable => errorType.isRetryable;
+
+  /// Get user-friendly error message
+  String get userFriendlyMessage => errorType.userMessage;
+
   @override
   String toString() {
-    return 'PaymentErrorResult(code: $errorCode, message: $errorMessage)';
+    return 'PaymentErrorResult(code: $errorCode, message: $errorMessage, type: ${errorType.name})';
   }
 }
 

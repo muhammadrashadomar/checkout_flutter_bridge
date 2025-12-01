@@ -11,16 +11,20 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.7.3'
-        // classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // Classpath is handled by the host app
     }
+}
+
+// Helper to allow host app to override versions
+def safeExtGet(prop, fallback) {
+    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
 }
 
 rootProject.allprojects {
     repositories {
         google()
         mavenCentral()
-        // Ensure the following Maven repositories are included, as they are specifically required for resolving Risk SDK dependencies:
+        // Required for Checkout.com Risk SDK dependencies
         maven { url = uri("https://jitpack.io") }
         maven { url = uri("https://maven.fpregistry.io/releases") }
     }
@@ -28,10 +32,10 @@ rootProject.allprojects {
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
-apply plugin: 'org.jetbrains.kotlin.plugin.compose' // ← REQUIRED for Kotlin 2.0+
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 android {
-    compileSdk 35
+    compileSdk safeExtGet('compileSdkVersion', 35)
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
@@ -43,7 +47,7 @@ android {
     }
 
     buildFeatures {
-        compose = true 
+        compose = true
     }
 
     sourceSets {
@@ -51,7 +55,7 @@ android {
     }
 
     defaultConfig {
-        minSdk 21
+        minSdk safeExtGet('minSdkVersion', 21)
     }
 
     namespace 'com.checkout.flutter.checkout_flutter_bridge'
@@ -72,7 +76,7 @@ dependencies {
     implementation "androidx.savedstate:savedstate:1.2.1"
     
     // Compose BOM
-    implementation platform("androidx.compose:compose-bom:2025.03.01")
+    implementation platform("androidx.compose:compose-bom:2025.02.00")
     implementation "androidx.compose.ui:ui"
     implementation "androidx.compose.ui:ui-tooling-preview"
     implementation "androidx.appcompat:appcompat:1.7.0"

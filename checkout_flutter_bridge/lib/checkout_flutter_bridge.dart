@@ -7,6 +7,7 @@ export 'src/models/google_pay_native_view.dart';
 export 'src/models/native_platform_view_type.dart';
 // Export models
 export 'src/models/payment_config.dart';
+export 'src/models/payment_error_code.dart';
 export 'src/models/payment_result.dart';
 export 'src/models/saved_card_config.dart';
 // Export services

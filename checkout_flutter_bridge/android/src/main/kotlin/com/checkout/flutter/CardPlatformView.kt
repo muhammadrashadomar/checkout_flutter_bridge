@@ -531,7 +531,7 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
         private fun sendError(code: String, message: String) {
                 runOnMainThread {
                         try {
-                                val error = mapOf("code" to code, "message" to message)
+                                val error = mapOf("errorCode" to code, "errorMessage" to message)
                                 channel.invokeMethod("paymentError", error)
                                 Log.d(TAG, "Error event sent to Flutter: $code - $message")
                         } catch (e: Exception) {
