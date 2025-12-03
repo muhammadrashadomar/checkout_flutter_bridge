@@ -2,9 +2,9 @@ import 'package:checkout_flutter_bridge/checkout_flutter_bridge.dart';
 import 'package:flutter/material.dart';
 
 // Google Pay Configuration
-const String paymentSessionId = 'ps_36EnX37ba2rnCrXyjd3i3VYVJT9';
-const String paymentSessionSecret = 'pss_51352b45-9839-47a9-92b4-c7aa272f3b67';
-const String publicKey = 'pk_sbox_abveb2d5jdvf5sompdwbgyndjm5';
+const String paymentSessionId = 'ps_36LJdaNhwTyLom2RTaKJ48uVKfL';
+const String paymentSessionSecret = 'pss_9c9bfc0f-31c2-45d1-a409-6ab80d8e4648';
+const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 
 // Payment configuration
 final _paymentConfig = PaymentConfig(
@@ -55,6 +55,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   final PaymentBridge _paymentBridge = PaymentBridge();
 
+  bool _canPay = false;
+
   @override
   void initState() {
     super.initState();
@@ -63,57 +65,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _setupPaymentBridge() {
     _paymentBridge.initialize();
+    _setupCallbacks();
   }
 
-  // void _handleCardTokenized(CardTokenResult result) {
-  //   ConsoleLogger.success(
-  //     'Token received - Type: ${result.type}, Network: ${result.cardNetwork ?? result.scheme}',
-  //   );
+  void _setupCallbacks() {
+    _paymentBridge.onCardReady = () {
+      ConsoleLogger.success("Ready");
+    };
+    _paymentBridge.onValidationChanged = (value) {
+      ConsoleLogger.info("ValidationChanged: $value");
+    };
+    _paymentBridge.onSessionData = (value) {
+      ConsoleLogger.success("SeesionData: $value");
+    };
 
-  //   // Build a more detailed message based on payment type
-  //   String message;
-  //   if (result.type?.toLowerCase() == 'googlepay') {
-  //     // Google Pay tokenization
-  //     message =
-  //         'Payment Method: Google Pay\n'
-  //         'Token: ${result.token}\n'
-  //         'Card Network: ${result.cardNetwork ?? result.scheme ?? 'N/A'}';
-
-  //     if (result.last4 != null && result.last4!.isNotEmpty) {
-  //       message += '\nLast 4 Digits: ${result.last4}';
-  //     }
-  //   } else {
-  //     // Card tokenization
-  //     message =
-  //         'Payment Method: Card\n'
-  //         'Token: ${result.token}\n'
-  //         'Last 4: ${result.last4 ?? 'N/A'}\n'
-  //         'Brand: ${result.brand ?? 'N/A'}\n'
-  //         'Expiry: ${result.expiryMonth ?? 'N/A'}/${result.expiryYear ?? 'N/A'}';
-  //   }
-
-  //   ConsoleLogger.success(message);
-  // }
-
-  // void _handlePaymentSuccess(PaymentSuccessResult result) {
-  //   ConsoleLogger.success('Payment ID: ${result.paymentId}');
-  // }
-
-  // void _handlePaymentError(PaymentErrorResult result) {
-  //   if (_enableDebugLogging) {
-  //     ConsoleLogger.error(
-  //       'Payment error: ${result.errorCode} - ${result.errorMessage}',
-  //     );
-  //   }
-
-  //   // Provide user-friendly error messages based on error codes
-  //   final userMessage = _getUserFriendlyErrorMessage(
-  //     result.errorCode,
-  //     result.errorMessage,
-  //   );
-
-  //   ConsoleLogger.error('Payment Error: $userMessage');
-  // }
+    _paymentBridge.onPaymentError = (error) {
+      ConsoleLogger.error("PaymentError: $error");
+    };
+  }
 
   /// Convert technical error codes to user-friendly messages
   // String _getUserFriendlyErrorMessage(
@@ -143,34 +112,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
   //   }
   // }
 
-  // void _handleSessionData(String result) {
-  //   ConsoleLogger.success('Session Data: $result');
-  // }
-
-  // Future<void> _getSessionData(CurrentPaymentType paymentType) async {
-  //   await _paymentBridge.submit(paymentType);
-  // }
-
-  // Future<void> _tokenizeCard() async {
-  //   // Validate card first
-  //   final isValid = await _paymentBridge.validateCard();
-
-  //   if (!isValid) {
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(
-  //           content: Text('Please check your card details'),
-  //           backgroundColor: Colors.orange,
-  //         ),
-  //       );
-  //     }
-  //     return;
-  //   }
-
-  //   // Trigger tokenization
-  //   await _paymentBridge.tokenizeCard();
-  // }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,8 +133,40 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ),
 
-            // Card payment view
-            CheckoutCardView(paymentConfig: _paymentConfig),
+            ElevatedButton(
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  builder:
+                      (context) => AddCardViewBody(
+                        canPay: (value) => setState(() => _canPay = value),
+                      ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey,
+              ),
+              child: Text('Add New Card'),
+            ),
+
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                if (!_canPay) return;
+                // Payment will be triggered
+                // If card is invalid, onError will be called
+                final bridge = PaymentBridge();
+                bridge.submit(CurrentPaymentType.card);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey,
+              ),
+              child: Text('Pay Now'),
+            ),
 
             // Google Pay view
             // CheckoutGooglePayView(paymentConfig: _paymentConfig),
@@ -205,9 +178,22 @@ class _PaymentScreenState extends State<PaymentScreen> {
 }
 
 class CheckoutCardView extends StatefulWidget {
-  const CheckoutCardView({super.key, required this.paymentConfig});
+  const CheckoutCardView({
+    super.key,
+    required this.paymentConfig,
+    this.onReady,
+    this.onTokenized,
+    this.onFetchedSessionData,
+    this.onValidInput,
+    this.onError,
+  });
 
   final PaymentConfig paymentConfig;
+  final void Function()? onReady;
+  final void Function(CardTokenResult)? onTokenized;
+  final void Function(String)? onFetchedSessionData;
+  final void Function(bool)? onValidInput;
+  final void Function(PaymentErrorResult)? onError;
 
   @override
   State<CheckoutCardView> createState() => _CheckoutCardViewState();
@@ -225,54 +211,42 @@ class _CheckoutCardViewState extends State<CheckoutCardView> {
           paymentConfig: widget.paymentConfig,
           loader: const Center(child: CircularProgressIndicator()),
           onReady: () {
-            ConsoleLogger.success('[Flow-Card] is ready');
+            // ConsoleLogger.success('[Flow-Card] is ready');
+            widget.onReady?.call();
           },
           onValidInput: (bool valid) {
             // Note: This may not fire in real-time due to SDK limitations
-            ConsoleLogger.success('[Flow-Card] Valid Card input: $valid');
+            // ConsoleLogger.success('[Flow-Card] Valid Card input: $valid');
             setState(() => _canPay = valid);
+            widget.onValidInput?.call(valid);
           },
           onCardTokenized: (CardTokenResult result) {
             ConsoleLogger.success(
               '[Flow-Card] Card tokenized: ${result.token}',
             );
+            widget.onTokenized?.call(result);
           },
-          onSessionData: (String sessionData) {
-            ConsoleLogger.success('[Flow-Card] Session data ready');
-          },
-          onError: (PaymentErrorResult error) {
-            ConsoleLogger.error(
-              '[Flow-Card] Payment error: ${error.errorCode} - ${error.errorMessage}',
-            );
-            // Show error to user
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(error.errorMessage),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          },
-        ),
-
-        // Pay button - enabled after card view is ready
-        ElevatedButton(
-          onPressed:
-              _canPay
-                  ? () {
-                    // Payment will be triggered
-                    // If card is invalid, onError will be called
-                    final bridge = PaymentBridge();
-                    bridge.submit(CurrentPaymentType.card);
-                  }
-                  : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: Colors.grey,
-          ),
-          child: Text(_canPay ? 'Pay Now' : 'Loading...'),
+          // onSessionData: (String sessionData) {
+          //   // ConsoleLogger.success(
+          //   //   '[Flow-Card] Session data ready: $sessionData',
+          //   // );
+          //   widget.onFetchedSessionData?.call(sessionData);
+          // },
+          // onError: (PaymentErrorResult error) {
+          //   // ConsoleLogger.error(
+          //   //   '[Flow-Card] Payment error: ${error.errorCode} - ${error.errorMessage}',
+          //   // );
+          //   widget.onError?.call(error);
+          //   // Show error to user
+          //   if (mounted) {
+          //     ScaffoldMessenger.of(context).showSnackBar(
+          //       SnackBar(
+          //         content: Text(error.errorMessage),
+          //         backgroundColor: Colors.red,
+          //       ),
+          //     );
+          //   }
+          // },
         ),
       ],
     );
@@ -342,6 +316,47 @@ class CheckoutGooglePayView extends StatelessWidget {
               );
             }
           },
+        ),
+      ],
+    );
+  }
+}
+
+class AddCardViewBody extends StatefulWidget {
+  const AddCardViewBody({super.key, required this.canPay});
+
+  final Function(bool) canPay;
+
+  @override
+  State<AddCardViewBody> createState() => _AddCardViewBodyState();
+}
+
+class _AddCardViewBodyState extends State<AddCardViewBody> {
+  bool _isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CheckoutCardView(
+          paymentConfig: _paymentConfig,
+          onTokenized: (value) {
+            setState(() => _isLoading = false);
+            widget.canPay(true);
+            Navigator.pop(context);
+          },
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            setState(() => _isLoading = true);
+            await PaymentBridge().tokenizeCard();
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: Colors.grey,
+          ),
+          child: Text(_isLoading ? 'Loading...' : 'Add Card'),
         ),
       ],
     );

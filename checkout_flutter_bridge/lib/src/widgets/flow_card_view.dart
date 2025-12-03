@@ -100,39 +100,49 @@ class _CheckoutFlowCardViewState extends State<CheckoutFlowCardView> {
     };
 
     // Validation changes
-    _paymentBridge.onValidationChanged = (isValid) {
-      if (mounted) {
-        widget.onValidInput?.call(isValid);
-      }
-    };
+    if (widget.onValidInput != null) {
+      _paymentBridge.onValidationChanged = (isValid) {
+        if (mounted) {
+          widget.onValidInput?.call(isValid);
+        }
+      };
+    }
 
     // Card tokenized
-    _paymentBridge.onCardTokenized = (result) {
-      if (mounted) {
-        widget.onCardTokenized?.call(result);
-      }
-    };
+    if (widget.onCardTokenized != null) {
+      _paymentBridge.onCardTokenized = (result) {
+        if (mounted) {
+          widget.onCardTokenized?.call(result);
+        }
+      };
+    }
 
     // Payment success
-    _paymentBridge.onPaymentSuccess = (result) {
-      if (mounted) {
-        widget.onPaymentSuccess?.call(result);
-      }
-    };
+    if (widget.onPaymentSuccess != null) {
+      _paymentBridge.onPaymentSuccess = (result) {
+        if (mounted) {
+          widget.onPaymentSuccess?.call(result);
+        }
+      };
+    }
 
     // Session data ready
-    _paymentBridge.onSessionData = (sessionData) {
-      if (mounted) {
-        widget.onSessionData?.call(sessionData);
-      }
-    };
+    if (widget.onSessionData != null) {
+      _paymentBridge.onSessionData = (sessionData) {
+        if (mounted) {
+          widget.onSessionData?.call(sessionData);
+        }
+      };
+    }
 
     // Payment error
-    _paymentBridge.onPaymentError = (error) {
-      if (mounted) {
-        widget.onError?.call(error);
-      }
-    };
+    if (widget.onError != null) {
+      _paymentBridge.onPaymentError = (error) {
+        if (mounted) {
+          widget.onError?.call(error);
+        }
+      };
+    }
   }
 
   @override

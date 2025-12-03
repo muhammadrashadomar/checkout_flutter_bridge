@@ -387,7 +387,7 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                                         cardComponent.submit()
                                                         Log.d(
                                                                 TAG,
-                                                                "✅ cardComponent.submit() completed successfully"
+                                                                "✅ [Flow-Card] cardComponent.submit() completed successfully"
                                                         )
                                                         true
                                                 } catch (e: Exception) {
