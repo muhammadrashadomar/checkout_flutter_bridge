@@ -340,6 +340,7 @@ class GooglePayPlatformView(
                 val tokenDetailsMap =
                         when (tokenData) {
                             is com.checkout.components.interfaces.model.TokenDetails -> {
+                                Log.d(TAG, "Token data: $tokenData")
                                 mapOf(
                                         "type" to tokenData.type,
                                         "token" to tokenData.token,

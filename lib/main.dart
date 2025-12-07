@@ -2,8 +2,8 @@ import 'package:checkout_flutter_bridge/checkout_flutter_bridge.dart';
 import 'package:flutter/material.dart';
 
 // Google Pay Configuration
-const String paymentSessionId = 'ps_36LJdaNhwTyLom2RTaKJ48uVKfL';
-const String paymentSessionSecret = 'pss_9c9bfc0f-31c2-45d1-a409-6ab80d8e4648';
+const String paymentSessionId = 'ps_36WBBG7vz3KsGZFOdKsQQGNo0LJ';
+const String paymentSessionSecret = 'pss_46ade997-622b-483c-a650-bc8deb4ad01a';
 const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 
 // Payment configuration
@@ -65,24 +65,24 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _setupPaymentBridge() {
     _paymentBridge.initialize();
-    _setupCallbacks();
+    // _setupCallbacks();
   }
 
-  void _setupCallbacks() {
-    _paymentBridge.onCardReady = () {
-      ConsoleLogger.success("Ready");
-    };
-    _paymentBridge.onValidationChanged = (value) {
-      ConsoleLogger.info("ValidationChanged: $value");
-    };
-    _paymentBridge.onSessionData = (value) {
-      ConsoleLogger.success("SeesionData: $value");
-    };
+  // void _setupCallbacks() {
+  //   _paymentBridge.onCardReady = () {
+  //     ConsoleLogger.success("Ready");
+  //   };
+  //   _paymentBridge.onValidationChanged = (value) {
+  //     ConsoleLogger.info("ValidationChanged: $value");
+  //   };
+  //   _paymentBridge.onSessionData = (value) {
+  //     ConsoleLogger.success("SeesionData: $value");
+  //   };
 
-    _paymentBridge.onPaymentError = (error) {
-      ConsoleLogger.error("PaymentError: $error");
-    };
-  }
+  //   _paymentBridge.onPaymentError = (error) {
+  //     ConsoleLogger.error("PaymentError: $error");
+  //   };
+  // }
 
   /// Convert technical error codes to user-friendly messages
   // String _getUserFriendlyErrorMessage(
@@ -153,12 +153,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
             SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () {
-                if (!_canPay) return;
+              onPressed: () async {
+                // if (!_canPay) return;
                 // Payment will be triggered
                 // If card is invalid, onError will be called
                 final bridge = PaymentBridge();
-                bridge.submit(CurrentPaymentType.card);
+                final result = await bridge.submit(CurrentPaymentType.card);
+
+                ConsoleLogger.success("SessionData: ${result.sessionData}");
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -200,8 +202,6 @@ class CheckoutCardView extends StatefulWidget {
 }
 
 class _CheckoutCardViewState extends State<CheckoutCardView> {
-  bool _canPay = false;
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -211,41 +211,17 @@ class _CheckoutCardViewState extends State<CheckoutCardView> {
           paymentConfig: widget.paymentConfig,
           loader: const Center(child: CircularProgressIndicator()),
           onReady: () {
-            // ConsoleLogger.success('[Flow-Card] is ready');
             widget.onReady?.call();
           },
           onValidInput: (bool valid) {
             // Note: This may not fire in real-time due to SDK limitations
-            // ConsoleLogger.success('[Flow-Card] Valid Card input: $valid');
-            setState(() => _canPay = valid);
             widget.onValidInput?.call(valid);
           },
-          onCardTokenized: (CardTokenResult result) {
-            ConsoleLogger.success(
-              '[Flow-Card] Card tokenized: ${result.token}',
-            );
-            widget.onTokenized?.call(result);
-          },
-          // onSessionData: (String sessionData) {
-          //   // ConsoleLogger.success(
-          //   //   '[Flow-Card] Session data ready: $sessionData',
-          //   // );
-          //   widget.onFetchedSessionData?.call(sessionData);
-          // },
-          // onError: (PaymentErrorResult error) {
-          //   // ConsoleLogger.error(
-          //   //   '[Flow-Card] Payment error: ${error.errorCode} - ${error.errorMessage}',
-          //   // );
-          //   widget.onError?.call(error);
-          //   // Show error to user
-          //   if (mounted) {
-          //     ScaffoldMessenger.of(context).showSnackBar(
-          //       SnackBar(
-          //         content: Text(error.errorMessage),
-          //         backgroundColor: Colors.red,
-          //       ),
-          //     );
-          //   }
+          // onCardTokenized: (CardTokenResult result) {
+          //   ConsoleLogger.success(
+          //     '[Flow-Card] Card tokenized: ${result.token}',
+          //   );
+          //   widget.onTokenized?.call(result);
           // },
         ),
       ],
@@ -332,7 +308,7 @@ class AddCardViewBody extends StatefulWidget {
 }
 
 class _AddCardViewBodyState extends State<AddCardViewBody> {
-  bool _isLoading = false;
+  // bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -340,23 +316,25 @@ class _AddCardViewBodyState extends State<AddCardViewBody> {
       children: [
         CheckoutCardView(
           paymentConfig: _paymentConfig,
-          onTokenized: (value) {
-            setState(() => _isLoading = false);
-            widget.canPay(true);
-            Navigator.pop(context);
-          },
+          // onTokenized: (value) {
+          //   // setState(() => _isLoading = false);
+          //   widget.canPay(true);
+          //   Navigator.pop(context);
+          // },
         ),
         ElevatedButton(
           onPressed: () async {
-            setState(() => _isLoading = true);
-            await PaymentBridge().tokenizeCard();
+            // setState(() => _isLoading = true);
+            final result = await PaymentBridge().tokenizeCard();
+
+            ConsoleLogger.success("Tokenized: ${result.token}");
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue,
             foregroundColor: Colors.white,
             disabledBackgroundColor: Colors.grey,
           ),
-          child: Text(_isLoading ? 'Loading...' : 'Add Card'),
+          child: Text('Add Card'),
         ),
       ],
     );

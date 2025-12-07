@@ -117,9 +117,7 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                         } else {
                                 // New card options
                                 ComponentOption(
-                                        showPayButton =
-                                                false, // ✅ Hide native button - controlled by
-                                        // Flutter
+                                        showPayButton = false,
                                         paymentButtonAction = PaymentButtonAction.TOKENIZE,
                                         cardConfiguration =
                                                 CardConfiguration(
@@ -450,7 +448,12 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                                                 "bin" to tokenData.bin,
                                                                 "cardType" to tokenData.cardType,
                                                                 "cardCategory" to
-                                                                        tokenData.cardCategory
+                                                                        tokenData.cardCategory,
+                                                                "issuer" to tokenData.issuer,
+                                                                "issuerCountry" to
+                                                                        tokenData.issuerCountry,
+                                                                // "issuerCountryName" to
+                                                                //         tokenData.issuerCountryName,
                                                         )
                                                 }
                                                 else -> {

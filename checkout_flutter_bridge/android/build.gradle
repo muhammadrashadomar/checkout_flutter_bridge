@@ -63,9 +63,9 @@ android {
 
 dependencies {
     // Checkout.com SDK
-    implementation "com.checkout:checkout-android-components:$checkout_version"
+    implementation "com.checkout:checkout-android-components:1.2.0"
     
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.0"
     
     // Lifecycle + ViewModel
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.8.7"

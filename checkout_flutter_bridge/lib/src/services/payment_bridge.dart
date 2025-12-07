@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:checkout_flutter_bridge/src/models/current_payment_type.dart';
+import 'package:checkout_flutter_bridge/src/models/session_result.dart';
 import 'package:checkout_flutter_bridge/src/utils/console_logger.dart';
 import 'package:flutter/services.dart';
 
@@ -186,11 +189,23 @@ class PaymentBridge {
   }
 
   /// Tokenize the card (trigger from Flutter button)
-  Future<void> tokenizeCard() async {
+  Future<CardTokenResult> tokenizeCard() async {
+    final completer = Completer<CardTokenResult>();
+    final previousTokenCallback = onCardTokenized;
+
+    onCardTokenized = (result) {
+      if (!completer.isCompleted) {
+        completer.complete(result);
+      }
+      previousTokenCallback?.call(result);
+    };
+
     try {
       ConsoleLogger.payment('Requesting card tokenization...');
       await _channel.invokeMethod('tokenizeCard');
-      // Result will come via onCardTokenized callback
+
+      // Wait for callback
+      return await completer.future;
     } on PlatformException catch (e) {
       ConsoleLogger.error('Tokenize card failed: ${e.message}');
       onPaymentError?.call(
@@ -199,6 +214,10 @@ class PaymentBridge {
           errorMessage: e.message ?? 'Tokenization failed',
         ),
       );
+      rethrow;
+    } finally {
+      // Restore original callbacks
+      onCardTokenized = previousTokenCallback;
     }
   }
 
@@ -229,13 +248,24 @@ class PaymentBridge {
   }
 
   /// Tokenize saved card (requires CVV input)
-  Future<void> tokenizeSavedCard() async {
+  Future<CardTokenResult> tokenizeSavedCard() async {
+    final completer = Completer<CardTokenResult>();
+    final previousTokenCallback = onCardTokenized;
+
+    onCardTokenized = (result) {
+      if (!completer.isCompleted) {
+        completer.complete(result);
+      }
+      previousTokenCallback?.call(result);
+    };
+
     try {
       ConsoleLogger.payment('Requesting saved card tokenization...');
       await _channel.invokeMethod(
         'tokenizeCard',
       ); // Same method, different component
-      // Result will come via onCardTokenized callback
+
+      return await completer.future;
     } on PlatformException catch (e) {
       ConsoleLogger.error('Tokenize saved card failed: ${e.message}');
       onPaymentError?.call(
@@ -244,12 +274,34 @@ class PaymentBridge {
           errorMessage: e.message ?? 'Tokenization failed',
         ),
       );
+      rethrow;
+    } finally {
+      onCardTokenized = previousTokenCallback;
     }
   }
 
-  /// Submit payment - works for both card and Google Pay
-  /// Automatically determines which session data method to call based on payment type
-  Future<void> submit(CurrentPaymentType paymentType) async {
+  Future<SessionResult> submit(CurrentPaymentType paymentType) async {
+    final tokenCompleter = Completer<CardTokenResult>();
+    final sessionCompleter = Completer<String>();
+
+    // Temporary callbacks to capture results
+    final previousTokenCallback = onCardTokenized;
+    final previousSessionCallback = onSessionData;
+
+    onCardTokenized = (result) {
+      if (!tokenCompleter.isCompleted) {
+        tokenCompleter.complete(result);
+      }
+      // Restore previous if needed
+      if (previousTokenCallback != null) previousTokenCallback(result);
+    };
+    onSessionData = (data) {
+      if (!sessionCompleter.isCompleted) {
+        sessionCompleter.complete(data);
+      }
+      if (previousSessionCallback != null) previousSessionCallback(data);
+    };
+
     try {
       ConsoleLogger.payment('Submitting payment...');
 
@@ -266,7 +318,14 @@ class PaymentBridge {
         await _channel.invokeMethod('getSessionData');
       }
 
-      // Result will come via onSessionData callback
+      // Wait for both callbacks
+      final tokenResult = await tokenCompleter.future;
+      final sessionData = await sessionCompleter.future;
+      // Return the result
+      return SessionResult(
+        token: tokenResult,
+        sessionData: sessionData,
+      );
     } on PlatformException catch (e) {
       ConsoleLogger.error('Submit failed: ${e.message}');
       onPaymentError?.call(
@@ -275,6 +334,11 @@ class PaymentBridge {
           errorMessage: e.message ?? 'Submit failed',
         ),
       );
+      rethrow;
+    } finally {
+      // Restore original callbacks
+      onCardTokenized = previousTokenCallback;
+      onSessionData = previousSessionCallback;
     }
   }
 
@@ -335,13 +399,23 @@ class PaymentBridge {
   }
 
   /// Tokenize Google Pay payment data using Checkout SDK
-  Future<void> tokenizeGooglePayData(String paymentData) async {
+  Future<CardTokenResult> tokenizeGooglePayData(String paymentData) async {
+    final completer = Completer<CardTokenResult>();
+    final previousTokenCallback = onCardTokenized;
+
+    onCardTokenized = (result) {
+      if (!completer.isCompleted) {
+        completer.complete(result);
+      }
+      previousTokenCallback?.call(result);
+    };
+
     try {
       ConsoleLogger.payment('Tokenizing Google Pay data...');
       await _channel.invokeMethod('tokenizeGooglePayData', {
         'paymentData': paymentData,
       });
-      // Token will come via cardTokenized callback
+      return await completer.future;
     } on PlatformException catch (e) {
       ConsoleLogger.error('Google Pay tokenization failed: ${e.message}');
       onPaymentError?.call(
@@ -350,16 +424,29 @@ class PaymentBridge {
           errorMessage: e.message ?? 'Google Pay tokenization failed',
         ),
       );
+      rethrow;
+    } finally {
+      onCardTokenized = previousTokenCallback;
     }
   }
 
   /// Tokenize Google Pay - triggers the native Google Pay component to tokenize
   /// The tokenization result will be sent via the onCardTokenized callback
-  Future<void> tokenizeGooglePay() async {
+  Future<CardTokenResult> tokenizeGooglePay() async {
+    final completer = Completer<CardTokenResult>();
+    final previousTokenCallback = onCardTokenized;
+
+    onCardTokenized = (result) {
+      if (!completer.isCompleted) {
+        completer.complete(result);
+      }
+      previousTokenCallback?.call(result);
+    };
+
     try {
       ConsoleLogger.payment('Requesting Google Pay tokenization...');
       await _channel.invokeMethod('tokenizeGooglePay');
-      // Result will come via onCardTokenized callback
+      return await completer.future;
     } on PlatformException catch (e) {
       ConsoleLogger.error('Tokenize Google Pay failed: ${e.message}');
       onPaymentError?.call(
@@ -368,15 +455,28 @@ class PaymentBridge {
           errorMessage: e.message ?? 'Google Pay tokenization failed',
         ),
       );
+      rethrow;
+    } finally {
+      onCardTokenized = previousTokenCallback;
     }
   }
 
   /// Get Google Pay session data
-  Future<void> getGooglePaySessionData() async {
+  Future<String> getGooglePaySessionData() async {
+    final completer = Completer<String>();
+    final previousSessionCallback = onSessionData;
+
+    onSessionData = (data) {
+      if (!completer.isCompleted) {
+        completer.complete(data);
+      }
+      previousSessionCallback?.call(data);
+    };
+
     try {
       ConsoleLogger.payment('Getting Google Pay session data...');
       await _channel.invokeMethod('getGooglePaySessionData');
-      // Session data will come via sessionDataReady callback
+      return await completer.future;
     } on PlatformException catch (e) {
       ConsoleLogger.error('Get Google Pay session data failed: ${e.message}');
       onPaymentError?.call(
@@ -385,6 +485,9 @@ class PaymentBridge {
           errorMessage: e.message ?? 'Failed to get session data',
         ),
       );
+      rethrow;
+    } finally {
+      onSessionData = previousSessionCallback;
     }
   }
 
