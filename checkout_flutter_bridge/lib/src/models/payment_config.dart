@@ -128,3 +128,29 @@ class GooglePayConfig {
     };
   }
 }
+
+/// Apple Pay Configuration (iOS)
+class ApplePayConfig {
+  /// Apple Pay merchant identifier (e.g., 'merchant.com.company.app')
+  /// This must be configured in Apple Developer Portal
+  final String merchantIdentifier;
+  final String merchantName;
+  final String countryCode;
+  final String currencyCode;
+
+  ApplePayConfig({
+    required this.merchantIdentifier,
+    required this.merchantName,
+    required this.countryCode,
+    required this.currencyCode,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'merchantIdentifier': merchantIdentifier,
+      'merchantName': merchantName,
+      'countryCode': countryCode,
+      'currencyCode': currencyCode,
+    };
+  }
+}

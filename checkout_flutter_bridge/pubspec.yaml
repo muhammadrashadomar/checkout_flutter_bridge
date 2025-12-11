@@ -22,3 +22,5 @@ flutter:
       android:
         package: com.checkout.flutter
         pluginClass: CheckoutFlutterBridgePlugin
+      ios:
+        pluginClass: CheckoutFlutterBridgePlugin

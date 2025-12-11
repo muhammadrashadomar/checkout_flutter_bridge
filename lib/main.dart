@@ -85,32 +85,32 @@ class _PaymentScreenState extends State<PaymentScreen> {
   // }
 
   /// Convert technical error codes to user-friendly messages
-  // String _getUserFriendlyErrorMessage(
-  //   String errorCode,
-  //   String technicalMessage,
-  // ) {
-  //   switch (errorCode) {
-  //     case 'INVALID_CONFIG':
-  //       return 'Payment configuration error. Please contact support.';
-  //     case 'GOOGLEPAY_UNAVAILABLE':
-  //     case 'GOOGLEPAY_NOT_AVAILABLE':
-  //       return 'Google Pay is not available on this device. Please use another payment method.';
-  //     case 'INITIALIZATION_FAILED':
-  //     case 'INIT_ERROR':
-  //       return 'Failed to initialize payment. Please try again.';
-  //     case 'TOKENIZATION_FAILED':
-  //     case 'TOKENIZATION_ERROR':
-  //       return 'Payment processing failed. Please try again or use another payment method.';
-  //     case 'TIMEOUT':
-  //       return 'Payment request timed out. Please check your connection and try again.';
-  //     case 'INVALID_STATE':
-  //       return 'Payment system not ready. Please wait a moment and try again.';
-  //     case 'PAYMENT_ERROR':
-  //       return 'Payment failed: $technicalMessage';
-  //     default:
-  //       return 'An error occurred: $technicalMessage';
-  //   }
-  // }
+  String _getUserFriendlyErrorMessage(
+    String errorCode,
+    String technicalMessage,
+  ) {
+    switch (errorCode) {
+      case 'INVALID_CONFIG':
+        return 'Payment configuration error. Please contact support.';
+      case 'GOOGLEPAY_UNAVAILABLE':
+      case 'GOOGLEPAY_NOT_AVAILABLE':
+        return 'Google Pay is not available on this device. Please use another payment method.';
+      case 'INITIALIZATION_FAILED':
+      case 'INIT_ERROR':
+        return 'Failed to initialize payment. Please try again.';
+      case 'TOKENIZATION_FAILED':
+      case 'TOKENIZATION_ERROR':
+        return 'Payment processing failed. Please try again or use another payment method.';
+      case 'TIMEOUT':
+        return 'Payment request timed out. Please check your connection and try again.';
+      case 'INVALID_STATE':
+        return 'Payment system not ready. Please wait a moment and try again.';
+      case 'PAYMENT_ERROR':
+        return 'Payment failed: $technicalMessage';
+      default:
+        return 'An error occurred: $technicalMessage';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

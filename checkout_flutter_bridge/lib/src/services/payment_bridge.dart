@@ -491,6 +491,106 @@ class PaymentBridge {
     }
   }
 
+  // ==================== APPLE PAY METHODS (iOS) ====================
+
+  /// Initialize Apple Pay (iOS only)
+  Future<bool> initApplePay(
+    PaymentConfig config,
+    ApplePayConfig applePayConfig,
+  ) async {
+    try {
+      final params = {
+        ...config.toMap(),
+        'applePayConfig': applePayConfig.toMap(),
+      };
+      final result = await _channel.invokeMethod('initApplePay', params);
+
+      // Track that we're using Apple Pay
+      if (result == true) {
+        ConsoleLogger.debug('Payment type set to: applepay');
+      }
+
+      return result == true;
+    } on PlatformException catch (e) {
+      ConsoleLogger.error('Init Apple Pay failed: ${e.message}');
+      return false;
+    }
+  }
+
+  /// Check if Apple Pay is available on this device (iOS only)
+  Future<bool> checkApplePayAvailability() async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'checkApplePayAvailability',
+      );
+      return result ?? false;
+    } on PlatformException catch (e) {
+      ConsoleLogger.error('Check Apple Pay availability failed: ${e.message}');
+      return false;
+    }
+  }
+
+  /// Tokenize Apple Pay - triggers the Apple Pay payment sheet (iOS only)
+  /// The tokenization result will be sent via the onCardTokenized callback
+  Future<CardTokenResult> tokenizeApplePay() async {
+    final completer = Completer<CardTokenResult>();
+    final previousTokenCallback = onCardTokenized;
+
+    onCardTokenized = (result) {
+      if (!completer.isCompleted) {
+        completer.complete(result);
+      }
+      previousTokenCallback?.call(result);
+    };
+
+    try {
+      ConsoleLogger.payment('Requesting Apple Pay tokenization...');
+      await _channel.invokeMethod('tokenizeApplePay');
+      return await completer.future;
+    } on PlatformException catch (e) {
+      ConsoleLogger.error('Tokenize Apple Pay failed: ${e.message}');
+      onPaymentError?.call(
+        PaymentErrorResult(
+          errorCode: e.code,
+          errorMessage: e.message ?? 'Apple Pay tokenization failed',
+        ),
+      );
+      rethrow;
+    } finally {
+      onCardTokenized = previousTokenCallback;
+    }
+  }
+
+  /// Get Apple Pay session data (iOS only)
+  Future<String> getApplePaySessionData() async {
+    final completer = Completer<String>();
+    final previousSessionCallback = onSessionData;
+
+    onSessionData = (data) {
+      if (!completer.isCompleted) {
+        completer.complete(data);
+      }
+      previousSessionCallback?.call(data);
+    };
+
+    try {
+      ConsoleLogger.payment('Getting Apple Pay session data...');
+      await _channel.invokeMethod('getApplePaySessionData');
+      return await completer.future;
+    } on PlatformException catch (e) {
+      ConsoleLogger.error('Get Apple Pay session data failed: ${e.message}');
+      onPaymentError?.call(
+        PaymentErrorResult(
+          errorCode: e.code,
+          errorMessage: e.message ?? 'Failed to get session data',
+        ),
+      );
+      rethrow;
+    } finally {
+      onSessionData = previousSessionCallback;
+    }
+  }
+
   // ==================== UTILITY METHODS ====================
 
   /// Reset/clear all callbacks

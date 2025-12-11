@@ -10,11 +10,13 @@ A Flutter plugin for integrating Checkout.com payment gateway with support for c
 
 - 🎯 **Card Tokenization** - Tokenize cards securely using Checkout.com SDK
 - 💾 **Saved Cards** - Support for stored payment methods with CVV verification
-- 💳 **Google Pay** - Native Google Pay integration with tokenization
+- 💳 **Google Pay** - Native Google Pay integration with tokenization (Android)
+- 🍎 **Apple Pay** - Native Apple Pay integration with tokenization (iOS)
 - 🎨 **Customizable UI** - Full control over card input appearance
 - 🔧 **Dynamic Configuration** - All parameters passed at runtime
 - 🔒 **Secure** - PCI DSS compliant with best practices
 - 📱 **Production Ready** - Comprehensive error handling and logging
+- 🔄 **Cross-Platform** - Supports both Android and iOS
 
 ## Installation
 
@@ -40,6 +42,12 @@ flutter pub get
   - `compileSdk`: 35+
   - **Kotlin**: 2.0.0+ (Required for Jetpack Compose compiler)
   - **Gradle**: Compatible with Kotlin 2.0+
+- **iOS**:
+  - `iOS`: 15.0+
+  - **Xcode**: 16.0+
+  - **Swift**: 6.0
+  - **Architecture**: arm64 only
+  - **Distribution**: Swift Package Manager
 
 ## Android Setup
 
@@ -76,6 +84,34 @@ allprojects {
         maven { url 'https://jitpack.io' }
     }
 }
+```
+
+## iOS Setup
+
+### 1. Add Checkout.com SDK via Swift Package Manager
+
+1. Open your iOS project in Xcode: `ios/Runner.xcodeproj`
+2. Go to **File > Add Package Dependencies**
+3. Add: `https://github.com/checkout/checkout-ios-components`
+4. Select the latest version
+
+### 2. Configure Apple Pay (Optional)
+
+For detailed Apple Pay setup instructions, see [ios/README.md](ios/README.md).
+
+Quick setup:
+1. Create Apple Merchant ID in Apple Developer Portal
+2. Generate and upload certificate to Checkout.com
+3. Add Apple Pay capability in Xcode
+4. Update `Info.plist` with Apple Pay usage description
+
+### 3. Update Info.plist
+
+Add Apple Pay usage description:
+
+```xml
+<key>NSApplePayUsageDescription</key>
+<string>This app uses Apple Pay to process secure payments</string>
 ```
 
 ## Quick Start
@@ -358,7 +394,7 @@ See the `example/` directory for a complete working example.
 ## Platform Support
 
 - ✅ Android (21+)
-- ⏳ iOS (coming soon)
+- ✅ iOS (15+)
 
 ## License
 
