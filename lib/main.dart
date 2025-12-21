@@ -2,8 +2,8 @@ import 'package:checkout_flutter_bridge/checkout_flutter_bridge.dart';
 import 'package:flutter/material.dart';
 
 // Google Pay Configuration
-const String paymentSessionId = 'ps_36WBBG7vz3KsGZFOdKsQQGNo0LJ';
-const String paymentSessionSecret = 'pss_46ade997-622b-483c-a650-bc8deb4ad01a';
+const String paymentSessionId = 'ps_379Fvs8mB07mrYSpYwQn8JbQqfH';
+const String paymentSessionSecret = 'pss_1250c43a-7dc7-41b6-8d95-b1d48dbe3cb4';
 const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 
 // Payment configuration
@@ -55,7 +55,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   final PaymentBridge _paymentBridge = PaymentBridge();
 
-  bool _canPay = false;
+  final bool _canPay = false;
+
+  bool _isGooglePayAvailable = false;
 
   @override
   void initState() {
@@ -134,14 +136,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
 
             ElevatedButton(
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  builder:
-                      (context) => AddCardViewBody(
-                        canPay: (value) => setState(() => _canPay = value),
-                      ),
-                );
+              onPressed: () async {
+                // showModalBottomSheet(
+                //   context: context,
+                //   builder:
+                //       (context) => AddCardViewBody(
+                //         canPay: (value) => setState(() => _canPay = value),
+                //       ),
+                // );
+
+                _isGooglePayAvailable =
+                    await _paymentBridge.checkGooglePayAvailability();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -171,7 +176,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
 
             // Google Pay view
-            // CheckoutGooglePayView(paymentConfig: _paymentConfig),
+            if (_isGooglePayAvailable)
+              CheckoutGooglePayView(paymentConfig: _paymentConfig),
           ],
         ),
       ),
@@ -217,6 +223,11 @@ class _CheckoutCardViewState extends State<CheckoutCardView> {
             // Note: This may not fire in real-time due to SDK limitations
             widget.onValidInput?.call(valid);
           },
+          onCardBinChanged: (CardMetadata bin) {
+            ConsoleLogger.success(
+              '[Flow-Card] Card bin changed: ${bin.toString()}',
+            );
+          },
           // onCardTokenized: (CardTokenResult result) {
           //   ConsoleLogger.success(
           //     '[Flow-Card] Card tokenized: ${result.token}',
@@ -246,6 +257,7 @@ class CheckoutGooglePayView extends StatelessWidget {
               '[Flow-Card] Card tokenized: ${result.token}',
             );
           },
+
           onSessionData: (String sessionData) {
             ConsoleLogger.success('[Flow-Card] Session data ready');
           },
