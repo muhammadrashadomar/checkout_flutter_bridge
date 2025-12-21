@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:checkout_flutter_bridge/src/models/card_metadata.dart';
 import 'package:checkout_flutter_bridge/src/models/current_payment_type.dart';
 import 'package:checkout_flutter_bridge/src/models/session_result.dart';
 import 'package:checkout_flutter_bridge/src/utils/console_logger.dart';
@@ -25,6 +26,7 @@ class PaymentBridge {
   Function(String)? onSessionData;
   Function()? onCardReady;
   Function(bool)? onValidationChanged;
+  Function(CardMetadata)? onCardBinChanged;
 
   /// Initialize the payment bridge and set up method call handler
   void initialize() {
@@ -58,6 +60,10 @@ class PaymentBridge {
 
       case 'validationChanged':
         _handleValidationChanged(call.arguments);
+        break;
+
+      case 'cardBinChanged':
+        _handleCardBinChanged(call.arguments);
         break;
 
       default:
@@ -218,6 +224,20 @@ class PaymentBridge {
     } finally {
       // Restore original callbacks
       onCardTokenized = previousTokenCallback;
+    }
+  }
+
+  void _handleCardBinChanged(dynamic arguments) {
+    if (arguments == null) {
+      ConsoleLogger.error('cardBinChanged arguments are null!');
+      return;
+    }
+
+    try {
+      final args = Map<String, dynamic>.from(arguments as Map);
+      onCardBinChanged?.call(CardMetadata.fromMap(args));
+    } catch (e) {
+      ConsoleLogger.error('Error processing card bin change: $e');
     }
   }
 

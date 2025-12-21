@@ -17,6 +17,7 @@ import com.checkout.components.interfaces.component.PaymentButtonAction
 import com.checkout.components.interfaces.error.CheckoutError
 import com.checkout.components.interfaces.model.ApiCallResult
 import com.checkout.components.interfaces.model.CallbackResult
+import com.checkout.components.interfaces.model.CardMetadata
 import com.checkout.components.interfaces.model.CardholderNamePosition
 import com.checkout.components.interfaces.model.PaymentMethodName
 import com.checkout.components.interfaces.model.PaymentSessionResponse
@@ -215,6 +216,10 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                         onTokenized = { result ->
                                 Log.d(TAG, "[Flow-Card]: tokenized successfully")
                                 sendCardTokenized(result.data)
+                                CallbackResult.Accepted
+                        },
+                        onCardBinChanged = { cardMetaData ->
+                                handleCardBinChanged(cardMetaData)
                                 CallbackResult.Accepted
                         },
                         onError = { _, checkoutError ->
@@ -453,8 +458,9 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                                                                 "issuerCountry" to
                                                                         tokenData.issuerCountry,
                                                                 // "issuerCountryName" to
-                                                                //         tokenData.issuerCountryName,
-                                                        )
+                                                                //
+                                                                // tokenData.issuerCountryName,
+                                                                )
                                                 }
                                                 else -> {
                                                         Log.w(
@@ -540,6 +546,25 @@ class CardPlatformView(private val activity: Activity, args: Any?, messenger: Bi
                         } catch (e: Exception) {
                                 Log.e(TAG, "Failed to send error event: ${e.message}", e)
                         }
+                }
+        }
+
+        private fun handleCardBinChanged(cardMetaData: CardMetadata) {
+                Log.d(TAG, "Card metadata sent to Flutter")
+                // Notify Flutter that card bin changed with the new metadata
+                runOnMainThread {
+                        channel.invokeMethod(
+                                "cardBinChanged",
+                                mapOf(
+                                        "bin" to cardMetaData.bin,
+                                        "scheme" to cardMetaData.scheme,
+                                        "type" to cardMetaData.cardType,
+                                        "category" to cardMetaData.cardCategory,
+                                        "issuer" to cardMetaData.issuer,
+                                        "issuer_country" to cardMetaData.issuerCountry,
+                                        "issuer_country_name" to cardMetaData.issuerCountryName,
+                                )
+                        )
                 }
         }
 

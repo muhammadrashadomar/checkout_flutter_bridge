@@ -46,6 +46,9 @@ class CheckoutFlowCardView extends StatefulWidget {
   /// Callback when card is successfully tokenized
   final Function(CardTokenResult)? onCardTokenized;
 
+  /// Callback when card bin is changed
+  final Function(CardMetadata)? onCardBinChanged;
+
   /// Callback when payment succeeds
   final Function(PaymentSuccessResult)? onPaymentSuccess;
 
@@ -67,6 +70,7 @@ class CheckoutFlowCardView extends StatefulWidget {
     this.onReady,
     this.onValidInput,
     this.onCardTokenized,
+    this.onCardBinChanged,
     this.onPaymentSuccess,
     this.onSessionData,
     this.onError,
@@ -113,6 +117,15 @@ class _CheckoutFlowCardViewState extends State<CheckoutFlowCardView> {
       _paymentBridge.onCardTokenized = (result) {
         if (mounted) {
           widget.onCardTokenized?.call(result);
+        }
+      };
+    }
+
+    // Card bin changed
+    if (widget.onCardBinChanged != null) {
+      _paymentBridge.onCardBinChanged = (bin) {
+        if (mounted) {
+          widget.onCardBinChanged?.call(bin);
         }
       };
     }

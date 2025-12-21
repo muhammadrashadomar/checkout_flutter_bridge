@@ -10,6 +10,7 @@ export 'src/models/payment_config.dart';
 export 'src/models/payment_error_code.dart';
 export 'src/models/payment_result.dart';
 export 'src/models/saved_card_config.dart';
+export 'src/models/card_metadata.dart';
 // Export services
 export 'src/services/payment_bridge.dart';
 // Export utils
