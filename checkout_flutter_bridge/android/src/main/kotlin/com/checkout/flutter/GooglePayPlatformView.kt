@@ -189,6 +189,9 @@ class GooglePayPlatformView(
 
                             isInitialized.set(true)
                             Log.i(TAG, "Google Pay component initialized successfully")
+                            
+                            // Notify Flutter that Google Pay button is ready
+                            sendGooglePayReady()
                         }
                     } else {
                         throw GooglePayException(
@@ -297,6 +300,21 @@ class GooglePayPlatformView(
                 Log.d(TAG, "Session data sent to Flutter successfully")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to send session data event", e)
+            }
+        }
+    }
+
+    /**
+     * Send Google Pay ready event to Flutter
+     * Called when the Google Pay button is fully rendered and ready for interaction
+     */
+    private fun sendGooglePayReady() {
+        runOnMainThread {
+            try {
+                channel.invokeMethod("googlePayReady", null)
+                Log.d(TAG, "Google Pay ready event sent to Flutter")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to send Google Pay ready event", e)
             }
         }
     }

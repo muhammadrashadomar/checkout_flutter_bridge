@@ -25,6 +25,7 @@ class PaymentBridge {
   Function(PaymentErrorResult)? onPaymentError;
   Function(String)? onSessionData;
   Function()? onCardReady;
+  Function()? onGooglePayReady;
   Function(bool)? onValidationChanged;
   Function(CardMetadata)? onCardBinChanged;
 
@@ -64,6 +65,10 @@ class PaymentBridge {
 
       case 'cardBinChanged':
         _handleCardBinChanged(call.arguments);
+        break;
+
+      case 'googlePayReady':
+        _handleGooglePayReady();
         break;
 
       default:
@@ -144,6 +149,11 @@ class PaymentBridge {
   void _handleCardReady() {
     ConsoleLogger.success('Card view ready');
     onCardReady?.call();
+  }
+
+  void _handleGooglePayReady() {
+    ConsoleLogger.success('Google Pay view ready');
+    onGooglePayReady?.call();
   }
 
   void _handleValidationChanged(dynamic arguments) {
@@ -607,6 +617,7 @@ class PaymentBridge {
     onPaymentError = null;
     onSessionData = null;
     onCardReady = null;
+    onGooglePayReady = null;
     onValidationChanged = null;
   }
 

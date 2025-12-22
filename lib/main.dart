@@ -244,6 +244,10 @@ class CheckoutGooglePayView extends StatelessWidget {
       children: [
         CheckoutFlowGooglePayView(
           paymentConfig: paymentConfig,
+          loader: const Center(child: CircularProgressIndicator()),
+          onReady: () {
+            ConsoleLogger.success("Ready");
+          },
           onCardTokenized: (CardTokenResult result) {
             ConsoleLogger.success(
               '[Flow-Card] Card tokenized: ${result.token}',

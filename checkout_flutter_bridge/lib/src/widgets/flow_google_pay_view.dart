@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 /// CheckoutFlowGooglePayView - Complete Google Pay payment widget with all callbacks
 ///
 /// This widget provides a complete Google Pay payment solution with:
+/// - Loading state management (shows loader until Google Pay button is ready)
 /// - Availability checking
 /// - Payment success/error handling
 /// - Token and session data callbacks
@@ -13,16 +14,21 @@ import 'package:flutter/material.dart';
 /// ```dart
 /// CheckoutFlowGooglePayView(
 ///   paymentConfig: config,
+///   onReady: () => print('Google Pay button ready'),
 ///   onCardTokenized: (result) => print('Token: ${result.token}'),
 ///   onSessionData: (sessionData) => _submitToBackend(sessionData),
 ///   onPaymentSuccess: (result) => _showSuccess(result.paymentId),
 ///   onError: (error) => _showError(error.errorMessage),
 ///   onUnavailable: () => _showAlternativePayments(),
+///   loader: CircularProgressIndicator(), // Optional custom loader
 /// )
 /// ```
 class CheckoutFlowGooglePayView extends StatefulWidget {
   /// Payment configuration for the Google Pay component
   final PaymentConfig paymentConfig;
+
+  /// Callback when Google Pay button is ready for interaction
+  final Function()? onReady;
 
   /// Callback when Google Pay is successfully tokenized
   final Function(CardTokenResult)? onCardTokenized;
@@ -43,17 +49,23 @@ class CheckoutFlowGooglePayView extends StatefulWidget {
   /// If not provided and Google Pay is unavailable, widget returns SizedBox.shrink()
   final Widget? unavailableWidget;
 
+  /// Custom loader widget to show while Google Pay button is loading
+  /// If not provided, no loader is shown
+  final Widget? loader;
+
   final double height;
 
   const CheckoutFlowGooglePayView({
     super.key,
     required this.paymentConfig,
+    this.onReady,
     this.onCardTokenized,
     this.onPaymentSuccess,
     this.onSessionData,
     this.onError,
     this.onUnavailable,
     this.unavailableWidget,
+    this.loader,
     this.height = 50,
   });
 
@@ -63,6 +75,7 @@ class CheckoutFlowGooglePayView extends StatefulWidget {
 }
 
 class _CheckoutFlowGooglePayViewState extends State<CheckoutFlowGooglePayView> {
+  bool _isReady = false;
   final PaymentBridge _paymentBridge = PaymentBridge();
 
   @override
@@ -72,6 +85,16 @@ class _CheckoutFlowGooglePayViewState extends State<CheckoutFlowGooglePayView> {
   }
 
   void _setupCallbacks() {
+    // Google Pay ready event
+    _paymentBridge.onGooglePayReady = () {
+      if (mounted) {
+        setState(() {
+          _isReady = true;
+        });
+        widget.onReady?.call();
+      }
+    };
+
     _paymentBridge.onCardTokenized = (result) {
       if (mounted) widget.onCardTokenized?.call(result);
     };
@@ -104,10 +127,16 @@ class _CheckoutFlowGooglePayViewState extends State<CheckoutFlowGooglePayView> {
 
   @override
   Widget build(BuildContext context) {
-    // Show the native view directly - SDK handles availability internally
-    return SizedBox(
-      height: widget.height,
-      child: GooglePayNativeView(paymentConfig: widget.paymentConfig),
+    // Google Pay button with loader overlay
+    return Stack(
+      children: [
+        SizedBox(
+          height: widget.height,
+          child: GooglePayNativeView(paymentConfig: widget.paymentConfig),
+        ),
+        // Loader - shown until Google Pay button is ready
+        if (!_isReady && widget.loader != null) widget.loader!,
+      ],
     );
   }
 }
