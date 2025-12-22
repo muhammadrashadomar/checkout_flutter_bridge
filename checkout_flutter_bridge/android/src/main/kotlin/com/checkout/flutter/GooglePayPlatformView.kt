@@ -212,6 +212,10 @@ class GooglePayPlatformView(
                         ErrorCode.TIMEOUT,
                         "Initialization timed out after ${INITIALIZATION_TIMEOUT_MS}ms"
                 )
+            } catch (e: CancellationException) {
+                // Rethrow cancellation - happens when view is disposed during init
+                Log.d(TAG, "Initialization cancelled (view disposed)")
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Unexpected error during initialization", e)
                 sendError(
@@ -241,37 +245,6 @@ class GooglePayPlatformView(
         } catch (e: Exception) {
             Log.e(TAG, "Error handling activity result", e)
             sendError(ErrorCode.PAYMENT_ERROR, "Failed to process payment result: ${e.message}")
-        }
-    }
-
-    // ==================== PUBLIC METHODS (Called from MainActivity) ====================
-
-    /**
-     * Check if Google Pay is available
-     *
-     * @param callback Callback to receive the availability result
-     */
-    fun checkAvailability(callback: (Boolean) -> Unit) {
-        if (!isInitialized.get()) {
-            Log.w(TAG, "Availability check: Component not initialized")
-            callback(false)
-            return
-        }
-
-        scope.launch {
-            try {
-                val isAvailable =
-                        if (::googlePayComponent.isInitialized) {
-                            googlePayComponent.isAvailable()
-                        } else {
-                            Log.w(TAG, "Availability check: Component not initialized")
-                            false
-                        }
-                callback(isAvailable)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking availability", e)
-                callback(false)
-            }
         }
     }
 

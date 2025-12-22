@@ -63,75 +63,48 @@ class CheckoutFlowGooglePayView extends StatefulWidget {
 }
 
 class _CheckoutFlowGooglePayViewState extends State<CheckoutFlowGooglePayView> {
-  bool _isAvailable = true; // Assume available until checked
   final PaymentBridge _paymentBridge = PaymentBridge();
 
   @override
   void initState() {
     super.initState();
     _setupCallbacks();
-    _checkAvailability();
   }
 
   void _setupCallbacks() {
-    // Google Pay tokenized
     _paymentBridge.onCardTokenized = (result) {
-      if (mounted) {
-        widget.onCardTokenized?.call(result);
-      }
+      if (mounted) widget.onCardTokenized?.call(result);
     };
 
-    // Payment success
     _paymentBridge.onPaymentSuccess = (result) {
-      if (mounted) {
-        widget.onPaymentSuccess?.call(result);
-      }
+      if (mounted) widget.onPaymentSuccess?.call(result);
     };
 
-    // Session data ready
     _paymentBridge.onSessionData = (sessionData) {
-      if (mounted) {
-        widget.onSessionData?.call(sessionData);
-      }
+      if (mounted) widget.onSessionData?.call(sessionData);
     };
 
-    // Payment error
+    // Error callback handles unavailability - SDK sends GOOGLEPAY_UNAVAILABLE error
     _paymentBridge.onPaymentError = (error) {
       if (mounted) {
+        // If Google Pay is unavailable, call the onUnavailable callback
+        if (error.errorCode == 'GOOGLEPAY_UNAVAILABLE' ||
+            error.errorCode == 'GOOGLEPAY_NOT_AVAILABLE') {
+          widget.onUnavailable?.call();
+        }
         widget.onError?.call(error);
       }
     };
   }
 
-  Future<void> _checkAvailability() async {
-    final isAvailable = await _paymentBridge.checkGooglePayAvailability();
-
-    if (mounted) {
-      setState(() {
-        _isAvailable = isAvailable;
-      });
-
-      if (!isAvailable) {
-        widget.onUnavailable?.call();
-      }
-    }
-  }
-
   @override
   void dispose() {
-    // Note: We don't clear callbacks here as PaymentBridge is a singleton
-    // and may be used elsewhere. Callbacks will be cleared when needed.
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isAvailable) {
-      // Google Pay not available
-      return widget.unavailableWidget ?? const SizedBox.shrink();
-    }
-
-    // Google Pay is available, show the native view
+    // Show the native view directly - SDK handles availability internally
     return SizedBox(
       height: widget.height,
       child: GooglePayNativeView(paymentConfig: widget.paymentConfig),

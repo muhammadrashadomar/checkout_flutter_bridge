@@ -2,8 +2,8 @@ import 'package:checkout_flutter_bridge/checkout_flutter_bridge.dart';
 import 'package:flutter/material.dart';
 
 // Google Pay Configuration
-const String paymentSessionId = 'ps_379Fvs8mB07mrYSpYwQn8JbQqfH';
-const String paymentSessionSecret = 'pss_1250c43a-7dc7-41b6-8d95-b1d48dbe3cb4';
+const String paymentSessionId = 'ps_37DC8C1WdIrLcrwMSgZnzR0Fcb3';
+const String paymentSessionSecret = 'pss_96216bf3-01fe-4237-977e-845953141c3d';
 const String publicKey = 'pk_sbox_fjizign6afqbt3btt3ialiku74s';
 
 // Payment configuration
@@ -54,10 +54,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
   var currentPaymentType = CurrentPaymentType.card;
 
   final PaymentBridge _paymentBridge = PaymentBridge();
-
-  final bool _canPay = false;
-
-  bool _isGooglePayAvailable = false;
 
   @override
   void initState() {
@@ -144,9 +140,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 //         canPay: (value) => setState(() => _canPay = value),
                 //       ),
                 // );
-
-                _isGooglePayAvailable =
-                    await _paymentBridge.checkGooglePayAvailability();
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
@@ -157,27 +150,26 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
 
             SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () async {
-                // if (!_canPay) return;
-                // Payment will be triggered
-                // If card is invalid, onError will be called
-                final bridge = PaymentBridge();
-                final result = await bridge.submit(CurrentPaymentType.card);
+            // ElevatedButton(
+            //   onPressed: () async {
+            //     // if (!_canPay) return;
+            //     // Payment will be triggered
+            //     // If card is invalid, onError will be called
+            //     final bridge = PaymentBridge();
+            //     final result = await bridge.submit(CurrentPaymentType.card);
 
-                ConsoleLogger.success("SessionData: ${result.sessionData}");
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.grey,
-              ),
-              child: Text('Pay Now'),
-            ),
+            //     ConsoleLogger.success("SessionData: ${result.sessionData}");
+            //   },
+            //   style: ElevatedButton.styleFrom(
+            //     backgroundColor: Colors.blue,
+            //     foregroundColor: Colors.white,
+            //     disabledBackgroundColor: Colors.grey,
+            //   ),
+            //   child: Text('Pay Now'),
+            // ),
 
             // Google Pay view
-            if (_isGooglePayAvailable)
-              CheckoutGooglePayView(paymentConfig: _paymentConfig),
+            CheckoutGooglePayView(paymentConfig: _paymentConfig),
           ],
         ),
       ),

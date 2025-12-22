@@ -109,23 +109,6 @@ class CheckoutFlutterBridgePlugin : FlutterPlugin, MethodCallHandler, ActivityAw
                 // Google Pay initialization happens in PlatformView
                 result.success(true)
             }
-            "checkGooglePayAvailability" -> {
-                if (googlePayPlatformView == null) {
-                    result.success(false)
-                    return
-                }
-                try {
-                    googlePayPlatformView!!.checkAvailability { isAvailable ->
-                        result.success(isAvailable)
-                    }
-                } catch (e: Exception) {
-                    result.error(
-                            "AVAILABILITY_CHECK_FAILED",
-                            "Failed to check availability: ${e.message}",
-                            null
-                    )
-                }
-            }
             "getGooglePaySessionData" -> {
                 // Session data is automatically sent via handleSubmit callback
                 result.success(true)

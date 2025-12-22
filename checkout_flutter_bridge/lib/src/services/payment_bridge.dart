@@ -388,19 +388,6 @@ class PaymentBridge {
     }
   }
 
-  /// Check if Google Pay is available on this device
-  Future<bool> checkGooglePayAvailability() async {
-    try {
-      final result = await _channel.invokeMethod<bool>(
-        'checkGooglePayAvailability',
-      );
-      return result ?? false;
-    } on PlatformException catch (e) {
-      ConsoleLogger.error('Check Google Pay availability failed: ${e.message}');
-      return false;
-    }
-  }
-
   /// Launch Google Pay payment sheet
   Future<void> launchGooglePaySheet(Map<String, dynamic> requestData) async {
     try {
